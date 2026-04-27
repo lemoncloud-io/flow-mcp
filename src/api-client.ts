@@ -13,22 +13,26 @@ import type {
 
 export class FlowApiClient {
   private client: AxiosInstance;
+  private baseUrl: string;
   private timeout: number;
   private blockCache: { data: ListResult<BlockView>; at: number } | null = null;
   private readonly BLOCK_CACHE_TTL = 5 * 60 * 1000; // 5 min
 
   constructor(config: FlowApiConfig) {
-    const baseUrl = config.FLOW_API_URL.replace(/\/+$/, '');
+    this.baseUrl = config.FLOW_API_URL.replace(/\/+$/, '');
+    const apiPath = resolveApiPath(config.FLOW_API_KEY);
     this.timeout = config.FLOW_API_TIMEOUT;
 
     this.client = axios.create({
-      baseURL: baseUrl,
+      baseURL: `${this.baseUrl}${apiPath}`,
       timeout: this.timeout,
       headers: {
         'x-api-key': config.FLOW_API_KEY,
         'Content-Type': 'application/json',
       },
     });
+
+    logger.info(`API base: ${this.baseUrl}${apiPath}`);
 
     this.client.interceptors.response.use(
       (response) => response,
@@ -43,9 +47,12 @@ export class FlowApiClient {
   // --- Flow operations ---
 
   async listFlows(params?: { isPublic?: boolean }): Promise<ListResult<FlowView>> {
-    const query: Record<string, string> = {};
-    if (params?.isPublic !== undefined) query.isPublic = params.isPublic ? '1' : '0';
-    const { data } = await this.client.get('/flows', { params: query });
+    if (params?.isPublic) {
+      // Public endpoint is outside /_api_ prefix
+      const { data } = await this.client.get(`${this.baseUrl}/public/flows`);
+      return data;
+    }
+    const { data } = await this.client.get('/flows');
     return data;
   }
 
@@ -64,18 +71,14 @@ export class FlowApiClient {
     return data;
   }
 
-  async deleteFlow(id: string): Promise<void> {
-    await this.client.delete(`/flows/${id}`);
-  }
-
   async runFlow(
     id: string,
     body?: { config?: Record<string, string> },
-    opts?: { async?: boolean },
+    opts?: { async?: boolean; connection?: string },
   ): Promise<FlowView> {
-    const { data } = await this.client.post(`/flows/${id}/run`, body ?? {}, {
-      params: { async: opts?.async ? '1' : '0' },
-    });
+    const params: Record<string, string> = { async: opts?.async ? '1' : '0' };
+    if (opts?.connection) params.connection = opts.connection;
+    const { data } = await this.client.post(`/flows/${id}/run`, body ?? {}, { params });
     return data;
   }
 
@@ -83,17 +86,30 @@ export class FlowApiClient {
 
   async runNode(
     id: string,
-    options?: { propagate?: boolean; config?: Record<string, string>; async?: boolean },
+    options?: { propagate?: boolean; config?: Record<string, string>; async?: boolean; connection?: string },
   ): Promise<NodeView> {
+    const params: Record<string, string> = {
+      async: options?.async ? '1' : '0',
+      propagate: options?.propagate ? '1' : '0',
+    };
+    if (options?.connection) params.connection = options.connection;
     const { data } = await this.client.post(
       `/nodes/${id}/run`,
       options?.config ? { config: options.config } : {},
-      {
-        params: {
-          async: options?.async ? '1' : '0',
-          propagate: options?.propagate ? '1' : '0',
-        },
-      },
+      { params },
+    );
+    return data;
+  }
+
+  async upsertNode(
+    nodeId: string,
+    flowId: string,
+    body: Record<string, unknown>,
+  ): Promise<NodeView> {
+    const { data } = await this.client.post(
+      `/nodes/${nodeId}/upsert`,
+      body,
+      { params: { flowId } },
     );
     return data;
   }
@@ -146,6 +162,12 @@ export class FlowApiClient {
     return new FlowApiError('api', `API error (${status ?? 'network'}): ${message}`);
   }
 }
+
+/** Resolve API path prefix based on API key format (matches frontend routing logic) */
+const resolveApiPath = (apiKey: string): string => {
+  if (apiKey.startsWith('ec-')) return '/_api_';
+  return '/_apis';
+};
 
 export type FlowApiErrorCode = 'auth' | 'not_found' | 'timeout' | 'api';
 

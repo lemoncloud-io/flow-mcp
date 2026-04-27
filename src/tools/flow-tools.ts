@@ -155,26 +155,6 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
   );
 
   server.registerTool(
-    'flow_delete',
-    {
-      title: 'Delete Flow',
-      description: 'Delete a flow permanently. This cannot be undone.',
-      inputSchema: z.object({
-        flowId: z.string().describe('Flow ID to delete'),
-      }),
-      annotations: { destructiveHint: true },
-    },
-    async ({ flowId }) => {
-      try {
-        await client.deleteFlow(flowId);
-        return toolJson({ deleted: true, flowId });
-      } catch (e) {
-        return toolError(e);
-      }
-    },
-  );
-
-  server.registerTool(
     'flow_run',
     {
       title: 'Run Flow',
@@ -198,23 +178,29 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
         const startTime = Date.now();
 
-        // Load node list for expectedNodeIds
+        // Load flow to find start nodes (nodes with no incoming edges)
         const flow = await client.loadFlow(flowId);
-        const expectedNodeIds = (flow.nodes ?? [])
-          .filter((n) => !n.disabled && n.id)
-          .map((n) => n.id!);
+        const allNodeIds = (flow.nodes ?? []).filter((n) => !n.disabled && n.id).map((n) => n.id!);
+        const targetNodeIds = new Set((flow.edges ?? []).map((e) => e.targetNodeId));
+        const startNodeIds = allNodeIds.filter((id) => !targetNodeIds.has(id));
 
-        const { nodeStates, timedOut } = await executeWithWs(apiConfig, client, {
+        // Run each start node with propagate=true to trigger the full chain
+        const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
           flowId,
-          expectedNodeIds,
+          expectedNodeIds: allNodeIds,
           timeout: timeout ?? 60_000,
-          triggerRun: () => client.runFlow(flowId, body, { async: true }).then(() => {}),
+          triggerRun: async (connectionId) => {
+            const runOpts = { propagate: true, async: true, connection: connectionId };
+            await Promise.all(
+              startNodeIds.map((nodeId) => client.runNode(nodeId, runOpts)),
+            );
+          },
         });
 
         const finalFlow = await client.loadFlow(flowId);
         const nodes = (finalFlow.nodes ?? []).map((n) => ({
           id: n.id ?? '',
-          status: n.status ?? nodeStates.get(n.id ?? '') ?? 'UNKNOWN',
+          status: nodeStates.get(n.id ?? '') ?? n.status ?? 'UNKNOWN',
           error: n.errorMessage ?? n.error,
         }));
 
@@ -226,8 +212,9 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
           status,
           nodes,
           duration: Date.now() - startTime,
+          eventLog,
           ...(timedOut && {
-            message: `Timed out after ${timeout ?? 60_000}ms. ${nodes.filter((n) => TERMINAL_STATES.has(n.status)).length}/${expectedNodeIds.length} nodes completed.`,
+            message: `Timed out after ${timeout ?? 60_000}ms. ${nodes.filter((n) => TERMINAL_STATES.has(n.status)).length}/${allNodeIds.length} nodes completed.`,
           }),
         });
       } catch (e) {
@@ -237,7 +224,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
   );
 };
 
-const resolveNodeId = (
+export const resolveNodeId = (
   ref: string,
   nodes: Array<{ id?: string }>,
 ): string => {

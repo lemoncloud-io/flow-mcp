@@ -37,7 +37,7 @@ export const registerBlockTools = (server: McpServer, client: FlowApiClient) => 
   );
 };
 
-const summarizeBlock = (b: BlockView) => ({
+export const summarizeBlock = (b: BlockView) => ({
   id: b.id,
   type: b.processType ?? b.$definition?.type,
   label: b.label ?? b.name,

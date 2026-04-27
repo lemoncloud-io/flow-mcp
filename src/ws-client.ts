@@ -2,41 +2,14 @@ import WebSocket from 'ws';
 import { logger } from './logger';
 import type { FlowApiConfig } from './config';
 import type { FlowApiClient } from './api-client';
-import type { WsEnvelope, FlowEvent } from './types';
 import { TERMINAL_STATES } from './types';
 
 interface WaitForCompletionParams {
   flowId: string;
   expectedNodeIds: string[];
-  triggerRun: () => Promise<void>;
+  triggerRun: (connectionId: string) => Promise<void>;
   timeout?: number;
 }
-
-/** Parse WS envelope → FlowEvent, handling both wrapped and direct patterns */
-const parseEvent = (raw: string): FlowEvent | null => {
-  try {
-    const envelope: WsEnvelope = JSON.parse(raw);
-    if (envelope.action === 'trace') return null;
-
-    const outer = envelope.data;
-    if (!outer) return null;
-
-    // Pattern A: service-wrapped { data: { type, id, flowId, ... } }
-    const inner = outer.data as Record<string, unknown> | undefined;
-    if (inner && typeof inner.type === 'string') {
-      return inner as unknown as FlowEvent;
-    }
-
-    // Pattern B: direct { type, id, flowId, ... }
-    if (typeof outer.type === 'string') {
-      return outer as unknown as FlowEvent;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-};
 
 /** Check if all expected nodes are terminal via API snapshot */
 export const checkNodeStatesViaApi = async (
@@ -56,12 +29,24 @@ export const checkNodeStatesViaApi = async (
   return allDone ? states : null;
 };
 
-/** Connect to WS, trigger run, wait for all expected nodes to reach terminal state */
+/**
+ * Connect to WS, get connectionId, trigger run, wait for completion.
+ *
+ * Flow:
+ * 1. Connect with `info=` param to get connectionId
+ * 2. Pass connectionId to triggerRun (run API uses it for directed messaging)
+ * 3. Listen for node events, track expectedNodeIds
+ * 4. Resolve when all expected nodes reach terminal state
+ */
 export const executeWithWs = (
   apiConfig: FlowApiConfig,
   client: FlowApiClient,
   params: WaitForCompletionParams,
-): Promise<{ nodeStates: Map<string, string>; timedOut: boolean }> => {
+): Promise<{
+  nodeStates: Map<string, string>;
+  timedOut: boolean;
+  eventLog: Array<Record<string, unknown>>;
+}> => {
   const { flowId, expectedNodeIds, triggerRun, timeout = 60_000 } = params;
   const wsUrl = apiConfig.FLOW_WS_URL;
 
@@ -71,11 +56,14 @@ export const executeWithWs = (
 
   return new Promise((resolve, reject) => {
     const nodeStates = new Map<string, string>();
+    const eventLog: Array<Record<string, unknown>> = [];
+    const startTs = Date.now();
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const cleanup = () => {
       if (timer) clearTimeout(timer);
+      if (quietTimer) clearTimeout(quietTimer);
       try { ws.close(); } catch { /* ignore */ }
     };
 
@@ -83,7 +71,7 @@ export const executeWithWs = (
       if (settled) return;
       settled = true;
       cleanup();
-      resolve({ nodeStates, timedOut });
+      resolve({ nodeStates, timedOut, eventLog });
     };
 
     const fail = (err: Error) => {
@@ -93,16 +81,31 @@ export const executeWithWs = (
       reject(err);
     };
 
-    const checkCompletion = () => {
-      if (expectedNodeIds.length === 0) return;
-      const allTerminal = expectedNodeIds.every((id) => {
-        const state = nodeStates.get(id);
-        return state && TERMINAL_STATES.has(state);
-      });
-      if (allTerminal) settle(false);
+    let quietTimer: ReturnType<typeof setTimeout> | undefined;
+    const QUIET_PERIOD = 3_000; // settle after 3s of no events
+
+    const resetQuietTimer = () => {
+      if (quietTimer) clearTimeout(quietTimer);
+      quietTimer = setTimeout(() => {
+        if (!settled && eventLog.length > 0) settle(false);
+      }, QUIET_PERIOD);
     };
 
-    const url = `${wsUrl}?x-api-key=${encodeURIComponent(apiConfig.FLOW_API_KEY)}&channels=0000`;
+    const checkCompletion = () => {
+      // Check if all expected nodes are terminal (fast path)
+      if (expectedNodeIds.length > 0) {
+        const allTerminal = expectedNodeIds.every((id) => {
+          const state = nodeStates.get(id);
+          return state && TERMINAL_STATES.has(state);
+        });
+        if (allTerminal) { settle(false); return; }
+      }
+      // Fallback: quiet period — if no new events for 3s, settle
+      resetQuietTimer();
+    };
+
+    // Connect with info= param to receive connectionId
+    const url = `${wsUrl}?x-api-key=${encodeURIComponent(apiConfig.FLOW_API_KEY)}&info=&channels=0000`;
     const ws = new WebSocket(url);
 
     ws.on('error', (err) => {
@@ -117,27 +120,49 @@ export const executeWithWs = (
     });
 
     ws.on('message', (data) => {
-      const event = parseEvent(String(data));
-      if (!event || event.type !== 'node') return;
-      if (event.flowId !== flowId) return;
+      const raw = String(data);
 
-      nodeStates.set(event.id, event.state);
-      logger.debug(`Node ${event.id}: ${event.state}`);
-      checkCompletion();
+      // Check for info message (contains connectionId)
+      try {
+        const msg = JSON.parse(raw);
+        if (msg.action === 'info' && msg.data?.connectionId) {
+          const connectionId = msg.data.connectionId as string;
+          logger.debug(`Got connectionId: ${connectionId}`);
+          onConnectionId(connectionId);
+          return;
+        }
+      } catch { /* ignore parse errors */ }
+
+      // Parse all message events (node + node/port)
+      try {
+        const msg = JSON.parse(raw);
+        if (msg.action !== 'message' || !msg.data) return;
+        const d = msg.data as Record<string, unknown>;
+
+        // Log raw event data with elapsed time
+        eventLog.push({
+          elapsed: Date.now() - startTs,
+          ...d,
+        });
+
+        // Track node states for completion detection
+        if (d.type === 'node' && typeof d.id === 'string' && typeof d.state === 'string') {
+          nodeStates.set(d.id, d.state);
+          logger.debug(`Node ${d.id}: ${d.state} (${d.stage ?? ''})`);
+          checkCompletion();
+        }
+      } catch { /* ignore */ }
     });
 
-    ws.on('open', async () => {
-      logger.debug(`WebSocket connected for flow ${flowId}`);
-
+    const onConnectionId = async (connectionId: string) => {
       try {
-        // Trigger the run
-        await triggerRun();
+        await triggerRun(connectionId);
       } catch (err) {
         fail(err instanceof Error ? err : new Error(String(err)));
         return;
       }
 
-      // [Eng 1B] Belt-and-suspenders — check if already done (non-fatal if this fails)
+      // Belt-and-suspenders: check if already done
       try {
         const snapshot = await checkNodeStatesViaApi(client, flowId, expectedNodeIds);
         if (snapshot) {
@@ -147,10 +172,9 @@ export const executeWithWs = (
           checkCompletion();
         }
       } catch {
-        // Non-fatal: WS monitoring continues even if API check fails
         logger.debug('Belt-and-suspenders check failed, continuing with WS monitoring');
       }
-    });
+    };
 
     timer = setTimeout(() => settle(true), timeout);
   });

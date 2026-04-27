@@ -1,3 +1,3 @@
-export { registerFlowTools } from './flow-tools';
+export { registerFlowTools, resolveNodeId } from './flow-tools';
 export { registerNodeTools } from './node-tools';
-export { registerBlockTools } from './block-tools';
+export { registerBlockTools, summarizeBlock } from './block-tools';

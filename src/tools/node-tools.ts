@@ -38,16 +38,17 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
 
         const startTime = Date.now();
 
-        const { nodeStates, timedOut } = await executeWithWs(apiConfig, client, {
+        const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
           flowId,
           expectedNodeIds: [nodeId],
           timeout: timeout ?? 30_000,
-          triggerRun: () => client.runNode(nodeId, { ...opts, async: true }).then(() => {}),
+          triggerRun: (connectionId) => client.runNode(nodeId, { ...opts, async: true, connection: connectionId }).then(() => {}),
         });
 
         const finalFlow = await client.loadFlow(flowId);
         const node = (finalFlow.nodes ?? []).find((n) => n.id === nodeId);
-        const status = node?.status ?? nodeStates.get(nodeId) ?? 'UNKNOWN';
+        // Prefer WS-reported state (more up-to-date than API which may lag)
+        const status = nodeStates.get(nodeId) ?? node?.status ?? 'UNKNOWN';
 
         const result: Record<string, unknown> = {
           nodeId,
@@ -64,6 +65,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
           result.message = `Timed out after ${timeout ?? 30_000}ms. Node status: ${status}`;
         }
 
+        result.eventLog = eventLog;
         return toolJson(result);
       } catch (e) {
         return toolError(e);
@@ -88,6 +90,48 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
     async ({ nodeId, portId, direction }) => {
       try {
         const result = await client.getPortData(nodeId, portId, direction);
+        return toolJson(result);
+      } catch (e) {
+        return toolError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    'node_update',
+    {
+      title: 'Update Node',
+      description:
+        'Update node properties (label, config, position, etc.). Requires flowId. ' +
+        'Use flow_load first to get current node data.',
+      inputSchema: z.object({
+        nodeId: z.string().describe('Node ID to update'),
+        flowId: z.string().describe('Flow ID containing this node'),
+        customLabel: z.optional(z.string()).describe('Display label (rename the node)'),
+        description: z.optional(z.string()).describe('Node description'),
+        config: z.optional(z.record(z.string(), z.string())).describe('Config key-value pairs to update'),
+        output: z.optional(z.record(z.string(), z.string())).describe('Output port overrides'),
+        position: z.optional(z.object({ x: z.number(), y: z.number() })).describe('Canvas position'),
+        disabled: z.optional(z.boolean()).describe('Disable/enable the node'),
+        blockId: z.optional(z.string()).describe('Change block type reference'),
+        errorMessage: z.optional(z.string()).describe('Set error message'),
+        autoExecutionEnabled: z.optional(z.boolean()).describe('Enable/disable auto execution'),
+      }),
+    },
+    async ({ nodeId, flowId, customLabel, description, config: nodeConfig, output, position, disabled, blockId, errorMessage, autoExecutionEnabled }) => {
+      try {
+        const body: Record<string, unknown> = {};
+        if (customLabel !== undefined) body.customLabel = customLabel;
+        if (description !== undefined) body.description = description;
+        if (nodeConfig !== undefined) body.config = nodeConfig;
+        if (output !== undefined) body.output = output;
+        if (position !== undefined) body.position = position;
+        if (disabled !== undefined) body.disabled = disabled;
+        if (blockId !== undefined) body.blockId = blockId;
+        if (errorMessage !== undefined) body.errorMessage = errorMessage;
+        if (autoExecutionEnabled !== undefined) body.autoExecutionEnabled = autoExecutionEnabled;
+
+        const result = await client.upsertNode(nodeId, flowId, body);
         return toolJson(result);
       } catch (e) {
         return toolError(e);
