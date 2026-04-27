@@ -5,5 +5,5 @@ export type { FlowApiErrorCode } from './api-client';
 export { getConfig, getConfigOrThrow } from './config';
 export type { FlowApiConfig } from './config';
 export { logger } from './logger';
-export { executeWithWs, isWsConfigured, checkNodeStatesViaApi } from './ws-client';
+export { executeWithWs } from './ws-client';
 export type * from './types';

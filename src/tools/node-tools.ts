@@ -76,27 +76,23 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
           triggerRun: (connectionId) => client.runNode(nodeId, { ...opts, async: true, connection: connectionId }).then(() => {}),
         });
 
-        const finalFlow = await client.loadFlow(flowId);
-        const node = (finalFlow.nodes ?? []).find((n) => n.id === nodeId);
-        // Prefer WS-reported state (more up-to-date than API which may lag)
-        const status = nodeStates.get(nodeId) ?? node?.status ?? 'UNKNOWN';
+        const status = nodeStates.get(nodeId) ?? 'UNKNOWN';
 
         const result: Record<string, unknown> = {
           nodeId,
           flowId,
           status,
           duration: Date.now() - startTime,
+          eventLog,
         };
 
-        if (node?.error || node?.errorMessage) {
-          result.error = node.errorMessage ?? node.error;
+        // Only fetch flow details for error info or timeout
+        if (status === 'ERROR' || timedOut) {
+          const finalFlow = await client.loadFlow(flowId);
+          const node = (finalFlow.nodes ?? []).find((n) => n.id === nodeId);
+          if (node?.error || node?.errorMessage) result.error = node.errorMessage ?? node.error;
+          if (timedOut) result.message = `Timed out after ${timeout ?? 30_000}ms. Node status: ${status}`;
         }
-
-        if (timedOut) {
-          result.message = `Timed out after ${timeout ?? 30_000}ms. Node status: ${status}`;
-        }
-
-        result.eventLog = eventLog;
         return toolJson(result);
       } catch (e) {
         return toolError(e);

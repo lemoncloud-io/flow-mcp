@@ -51,7 +51,7 @@ describe('MCP Protocol Integration', () => {
     await server.close();
   });
 
-  it('should list all 13 tools', async () => {
+  it('should list all 15 tools', async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
 
@@ -65,6 +65,8 @@ describe('MCP Protocol Integration', () => {
       'flow_load',
       'flow_run',
       'flow_save',
+      'flow_update',
+      'node_create',
       'node_delete',
       'node_get_port',
       'node_run',

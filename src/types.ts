@@ -161,18 +161,4 @@ export interface NodeView {
   $flow?: FlowView;
 }
 
-// --- WebSocket event types ---
-
-export interface WsEnvelope {
-  action: string;
-  data: Record<string, unknown>;
-  ts?: string;
-  channel?: string;
-}
-
-export type FlowEvent =
-  | { type: 'node'; id: string; flowId: string; state: string; ts: number; error?: string }
-  | { type: 'node/port'; id: string; flowId: string; ts: number }
-  | { type: 'flow'; id: string; timestamp: number };
-
 export const TERMINAL_STATES = new Set(['COMPLETED', 'ERROR', 'SKIPPED']);

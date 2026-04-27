@@ -12,7 +12,7 @@ interface WaitForCompletionParams {
 }
 
 /** Check if all expected nodes are terminal via API snapshot */
-export const checkNodeStatesViaApi = async (
+const checkNodeStatesViaApi = async (
   client: FlowApiClient,
   flowId: string,
   expectedNodeIds: string[],
@@ -29,15 +29,7 @@ export const checkNodeStatesViaApi = async (
   return allDone ? states : null;
 };
 
-/**
- * Connect to WS, get connectionId, trigger run, wait for completion.
- *
- * Flow:
- * 1. Connect with `info=` param to get connectionId
- * 2. Pass connectionId to triggerRun (run API uses it for directed messaging)
- * 3. Listen for node events, track expectedNodeIds
- * 4. Resolve when all expected nodes reach terminal state
- */
+/** Connect to WS, get connectionId, trigger run, wait for completion */
 export const executeWithWs = (
   apiConfig: FlowApiConfig,
   client: FlowApiClient,
@@ -60,6 +52,8 @@ export const executeWithWs = (
     const startTs = Date.now();
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let quietTimer: ReturnType<typeof setTimeout> | undefined;
+    const QUIET_PERIOD = 1_500;
 
     const cleanup = () => {
       if (timer) clearTimeout(timer);
@@ -81,9 +75,6 @@ export const executeWithWs = (
       reject(err);
     };
 
-    let quietTimer: ReturnType<typeof setTimeout> | undefined;
-    const QUIET_PERIOD = 1_500;
-
     const resetQuietTimer = () => {
       if (quietTimer) clearTimeout(quietTimer);
       quietTimer = setTimeout(() => {
@@ -100,56 +91,6 @@ export const executeWithWs = (
       resetQuietTimer();
     };
 
-    // Connect with info= param to receive connectionId
-    const url = `${wsUrl}?x-api-key=${encodeURIComponent(apiConfig.FLOW_API_KEY)}&info=&channels=0000`;
-    const ws = new WebSocket(url);
-
-    ws.on('error', (err) => {
-      logger.error('WebSocket error:', err);
-      fail(new Error(`WebSocket connection failed: ${err.message}`));
-    });
-
-    ws.on('close', () => {
-      if (!settled) {
-        fail(new Error('WebSocket connection closed unexpectedly'));
-      }
-    });
-
-    ws.on('message', (data) => {
-      const raw = String(data);
-
-      // Check for info message (contains connectionId)
-      try {
-        const msg = JSON.parse(raw);
-        if (msg.action === 'info' && msg.data?.connectionId) {
-          const connectionId = msg.data.connectionId as string;
-          logger.debug(`Got connectionId: ${connectionId}`);
-          onConnectionId(connectionId);
-          return;
-        }
-      } catch { /* ignore parse errors */ }
-
-      // Parse all message events (node + node/port)
-      try {
-        const msg = JSON.parse(raw);
-        if (msg.action !== 'message' || !msg.data) return;
-        const d = msg.data as Record<string, unknown>;
-
-        // Log raw event data with elapsed time
-        eventLog.push({
-          elapsed: Date.now() - startTs,
-          ...d,
-        });
-
-        // Track node states for completion detection
-        if (d.type === 'node' && typeof d.id === 'string' && typeof d.state === 'string') {
-          nodeStates.set(d.id, d.state);
-          logger.debug(`Node ${d.id}: ${d.state} (${d.stage ?? ''})`);
-          checkCompletion();
-        }
-      } catch { /* ignore */ }
-    });
-
     const onConnectionId = async (connectionId: string) => {
       try {
         await triggerRun(connectionId);
@@ -162,15 +103,48 @@ export const executeWithWs = (
       try {
         const snapshot = await checkNodeStatesViaApi(client, flowId, expectedNodeIds);
         if (snapshot) {
-          for (const [id, state] of snapshot) {
-            nodeStates.set(id, state);
-          }
+          for (const [id, state] of snapshot) nodeStates.set(id, state);
           checkCompletion();
         }
       } catch {
         logger.debug('Belt-and-suspenders check failed, continuing with WS monitoring');
       }
     };
+
+    const url = `${wsUrl}?x-api-key=${encodeURIComponent(apiConfig.FLOW_API_KEY)}&info=&channels=0000`;
+    const ws = new WebSocket(url);
+
+    ws.on('error', (err) => {
+      logger.error('WebSocket error:', err);
+      fail(new Error(`WebSocket connection failed: ${err.message}`));
+    });
+
+    ws.on('close', () => {
+      if (!settled) fail(new Error('WebSocket connection closed unexpectedly'));
+    });
+
+    ws.on('message', (data) => {
+      try {
+        const msg = JSON.parse(String(data));
+
+        if (msg.action === 'info' && msg.data?.connectionId) {
+          logger.debug(`Got connectionId: ${msg.data.connectionId}`);
+          onConnectionId(msg.data.connectionId as string);
+          return;
+        }
+
+        if (msg.action !== 'message' || !msg.data) return;
+        const d = msg.data as Record<string, unknown>;
+
+        eventLog.push({ elapsed: Date.now() - startTs, ...d });
+
+        if (d.type === 'node' && typeof d.id === 'string' && typeof d.state === 'string') {
+          nodeStates.set(d.id, d.state);
+          logger.debug(`Node ${d.id}: ${d.state} (${d.stage ?? ''})`);
+          checkCompletion();
+        }
+      } catch { /* ignore parse errors */ }
+    });
 
     timer = setTimeout(() => settle(true), timeout);
   });

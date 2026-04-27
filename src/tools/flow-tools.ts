@@ -2,7 +2,7 @@ import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { FlowApiClient } from '../api-client';
 import type { FlowApiConfig } from '../config';
-import { executeWithWs, isWsConfigured, checkNodeStatesViaApi } from '../ws-client';
+import { executeWithWs, isWsConfigured } from '../ws-client';
 import { TERMINAL_STATES } from '../types';
 import { filterDefined, toolError, toolJson } from './helpers';
 
