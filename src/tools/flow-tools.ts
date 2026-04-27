@@ -72,6 +72,97 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
   );
 
   server.registerTool(
+    'flow_graph',
+    {
+      title: 'Flow Graph',
+      description:
+        'Visualize flow as a Mermaid diagram with node statuses, data values, and execution stats. ' +
+        'Shows the complete graph structure at a glance.',
+      inputSchema: z.object({
+        flowId: z.string().describe('Flow ID to visualize'),
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ flowId }) => {
+      try {
+        const flow = await client.loadFlow(flowId);
+        const nodes = flow.nodes ?? [];
+        const edges = flow.edges ?? [];
+        const ports = flow.ports ?? [];
+
+        // Build node label map
+        const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+        // Status emoji
+        const statusIcon = (s?: string) => {
+          switch (s) {
+            case 'COMPLETED': return '✅';
+            case 'ERROR': return '❌';
+            case 'RUNNING': return '🔄';
+            case 'READY': return '⏳';
+            case 'SKIPPED': return '⏭️';
+            default: return '⚪';
+          }
+        };
+
+        // Mermaid graph
+        const lines: string[] = ['graph LR'];
+
+        for (const n of nodes) {
+          const label = n.customLabel ?? n.type ?? n.id;
+          const icon = statusIcon(n.status);
+          const configSummary = n.config
+            ? Object.entries(n.config).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')
+            : '';
+          const detail = configSummary ? `<br/><small>${configSummary}</small>` : '';
+          lines.push(`  ${n.id}["${icon} ${label}${detail}"]`);
+        }
+
+        for (const e of edges) {
+          const srcLabel = e.sourcePortId ?? 'out';
+          const tgtLabel = e.targetPortId ?? 'in';
+          lines.push(`  ${e.sourceNodeId} -->|${srcLabel} → ${tgtLabel}| ${e.targetNodeId}`);
+        }
+
+        const mermaid = lines.join('\n');
+
+        // Node status table
+        const statusTable = nodes.map((n) => ({
+          id: n.id,
+          label: n.customLabel ?? n.type,
+          status: n.status ?? 'IDLE',
+          error: n.errorMessage ?? n.error ?? '',
+          config: n.config,
+        }));
+
+        // Port data summary
+        const portSummary = ports.map((p) => ({
+          id: p.id,
+          nodeId: p.nodeId,
+          direction: p.direction,
+          data: p.data,
+        }));
+
+        // Orphan detection
+        const connectedIds = new Set([
+          ...edges.map((e) => e.sourceNodeId),
+          ...edges.map((e) => e.targetNodeId),
+        ]);
+        const orphans = nodes.filter((n) => !connectedIds.has(n.id!)).map((n) => n.id);
+
+        return {
+          content: [
+            { type: 'text' as const, text: `## Flow: ${flow.name ?? flowId}\n\n\`\`\`mermaid\n${mermaid}\n\`\`\`` },
+            { type: 'text' as const, text: JSON.stringify({ nodes: statusTable, ports: portSummary, orphans }, null, 2) },
+          ],
+        };
+      } catch (e) {
+        return toolError(e);
+      }
+    },
+  );
+
+  server.registerTool(
     'flow_create',
     {
       title: 'Create Flow',
