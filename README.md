@@ -138,12 +138,13 @@ Restart your client and say **"Show my flows"**.
 → Port data (value, type, timestamp)
 ```
 
-## 15 Tools
+## 16 Tools
 
 Claude automatically selects the right tool based on your request.
 
 | Tool | What it does |
 |------|-------------|
+| `profile_get` | Check API key configuration status |
 | `block_list` | List available block types |
 | `flow_list` | List your workflows |
 | `flow_load` | Load full flow state (nodes, edges, ports) |
@@ -208,7 +209,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 15 tools)
+  -> server.ts (McpServer + 16 tools)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)

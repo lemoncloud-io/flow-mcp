@@ -161,4 +161,11 @@ export interface NodeView {
     $flow?: FlowView;
 }
 
+export interface ProfileView {
+    sid: string;
+    uid: string;
+    geminiApiKey?: string;
+    openaiApiKey?: string;
+}
+
 export const TERMINAL_STATES = new Set(['COMPLETED', 'ERROR', 'SKIPPED']);

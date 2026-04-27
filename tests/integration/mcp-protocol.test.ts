@@ -51,7 +51,7 @@ describe('MCP Protocol Integration', () => {
     await server.close();
   });
 
-  it('should list all 15 tools', async () => {
+  it('should list all 16 tools', async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
 
@@ -71,6 +71,7 @@ describe('MCP Protocol Integration', () => {
       'node_get_port',
       'node_run',
       'node_update',
+      'profile_get',
     ]);
   });
 

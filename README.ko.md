@@ -136,12 +136,13 @@ npm install -g @lemoncloud/flow-mcp
 → 포트 데이터 (값, 타입, 타임스탬프)
 ```
 
-## 15개 도구
+## 16개 도구
 
 자연어로 요청하면 Claude가 자동으로 적절한 도구를 선택합니다.
 
 | 도구 | 하는 일 |
 |------|--------|
+| `profile_get` | API 키 설정 상태 확인 |
 | `block_list` | 사용 가능한 블록 종류 조회 |
 | `flow_list` | 내 워크플로우 목록 |
 | `flow_load` | 워크플로우 상세 로드 (노드, 엣지, 포트) |
@@ -206,7 +207,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 15 tools)
+  -> server.ts (McpServer + 16 tools)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)

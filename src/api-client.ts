@@ -1,7 +1,16 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { logger } from './logger';
 import type { FlowApiConfig } from './config';
-import type { ListResult, FlowView, SaveFlowView, SaveFlowBody, NodeView, PortData, BlockView } from './types';
+import type {
+    ListResult,
+    FlowView,
+    SaveFlowView,
+    SaveFlowBody,
+    NodeView,
+    PortData,
+    BlockView,
+    ProfileView,
+} from './types';
 
 export class FlowApiClient {
     private client: AxiosInstance;
@@ -37,6 +46,11 @@ export class FlowApiClient {
     }
 
     // --- Flow operations ---
+
+    async getProfile(): Promise<ProfileView> {
+        const { data } = await this.client.get('/flows/0/profile');
+        return data;
+    }
 
     async listFlows(params?: { isPublic?: boolean }): Promise<ListResult<FlowView>> {
         if (params?.isPublic) {

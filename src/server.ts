@@ -16,6 +16,7 @@ export const createServer = (): { run: () => Promise<void> } => {
             capabilities: { tools: {} },
             instructions:
                 'Eureka Flow MCP server. Typical workflow: ' +
+                '0) profile_get → check API key status (required for execution), ' +
                 '1) block_list → discover block types, ' +
                 '2) flow_create → build a new flow, ' +
                 '3) flow_run/node_run → execute, ' +
