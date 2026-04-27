@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  MCP server for <a href="https://flow.eureka.codes"><b>Eureka Flow</b></a> — manage visual workflows from Claude Desktop.<br/>
+  MCP server for <a href="https://flow.eureka.codes"><b>Eureka Flow</b></a> — manage visual workflows from any MCP-compatible AI client.<br/>
   Build, execute, and monitor data processing pipelines through natural language.
 </p>
 
@@ -30,7 +30,9 @@
 
 ## What You Can Do
 
-Just talk to Claude:
+Works with **Claude Desktop**, **Cursor**, **Windsurf**, **VS Code (Continue/Cline)**, **Claude Code**, and any MCP-compatible client.
+
+Just ask in natural language:
 
 | What you want | Say this to Claude |
 |---------------|-------------------|
@@ -58,9 +60,9 @@ npm install -g @lemoncloud/flow-mcp
 
 Get your API key from [Eureka Codes Console](https://console.eureka.codes).
 
-### Step 3: Configure Claude Desktop
+### Step 3: Configure Your MCP Client
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -76,9 +78,11 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
+**Cursor / Windsurf** — add the same `mcpServers` config to your IDE's MCP settings.
+
 ### Step 4: Go!
 
-Restart Claude Desktop and say **"Show my flows"**.
+Restart your client and say **"Show my flows"**.
 
 > **Note:** Only `FLOW_API_KEY` is required. API URL has a sensible default.
 

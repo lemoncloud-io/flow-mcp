@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <b><a href="https://flow.eureka.codes">Eureka Flow</a>를 Claude에서 바로 사용할 수 있게 해주는 MCP 서버</b><br/>
+  <b><a href="https://flow.eureka.codes">Eureka Flow</a>를 AI에서 바로 사용할 수 있게 해주는 MCP 서버</b><br/>
   자연어로 워크플로우를 만들고, 실행하고, 결과를 확인하세요.
 </p>
 
@@ -30,7 +30,9 @@
 
 ## 이런 걸 할 수 있어요
 
-Claude에게 이렇게 말하면 됩니다:
+**Claude Desktop**, **Cursor**, **Windsurf**, **VS Code (Continue/Cline)**, **Claude Code** 등 MCP를 지원하는 모든 AI 클라이언트에서 사용 가능합니다.
+
+AI에게 이렇게 말하면 됩니다:
 
 | 하고 싶은 일 | Claude에게 이렇게 말하세요 |
 |-------------|------------------------|
@@ -58,9 +60,9 @@ npm install -g @lemoncloud/flow-mcp
 
 [Eureka Codes 콘솔](https://console.eureka.codes)에서 API 키를 발급받으세요.
 
-### 3단계: Claude Desktop 설정
+### 3단계: MCP 클라이언트 설정
 
-`~/Library/Application Support/Claude/claude_desktop_config.json` 파일에 추가:
+**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json` 파일에 추가:
 
 ```json
 {
@@ -76,9 +78,11 @@ npm install -g @lemoncloud/flow-mcp
 }
 ```
 
+**Cursor / Windsurf** — IDE의 MCP 설정에 동일한 `mcpServers` 내용을 추가하세요.
+
 ### 4단계: 시작!
 
-Claude Desktop을 재시작하고 **"내 flow 목록 보여줘"** 라고 말해보세요.
+클라이언트를 재시작하고 **"내 flow 목록 보여줘"** 라고 말해보세요.
 
 > **참고:** `FLOW_API_KEY`만 있으면 바로 사용할 수 있습니다. API URL은 기본값이 설정되어 있습니다.
 
