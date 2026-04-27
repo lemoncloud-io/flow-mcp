@@ -14,7 +14,7 @@ src/
 ├── types.ts            # Domain types (FlowView, NodeData, EdgeData, etc.)
 ├── tools/
 │   ├── helpers.ts      # toolJson(), toolError() response helpers
-│   ├── flow-tools.ts   # 7 flow tools (list/load/graph/create/update/save/run)
+│   ├── flow-tools.ts   # 8 flow tools (profile/list/load/graph/create/update/save/run)
 │   ├── node-tools.ts   # 7 tools (create/run/get_port/update/delete, edge_create/delete)
 │   ├── block-tools.ts  # 1 block tool (list with cache)
 │   └── index.ts        # barrel export
@@ -48,6 +48,7 @@ npm test         # Run tests
 
 | Tool | Endpoint |
 |------|----------|
+| profile_get | `GET /flows/0/profile` |
 | flow_list | `GET /flows` or `GET /public/flows` |
 | flow_load | `GET /flows/:id/load` |
 | flow_graph | Uses `flow_load` data to generate Mermaid diagram |

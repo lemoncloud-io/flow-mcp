@@ -24,6 +24,32 @@ const EdgeDataSchema = z.object({
 
 export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiConfig: FlowApiConfig) => {
     server.registerTool(
+        'profile_get',
+        {
+            title: 'Get Profile',
+            description:
+                'Check user profile and API key configuration status. ' +
+                'Returns whether geminiApiKey and openaiApiKey are configured. ' +
+                'These keys are required for flow execution — if missing, flows cannot run.',
+            inputSchema: z.object({}),
+            annotations: { readOnlyHint: true },
+        },
+        async () => {
+            try {
+                const profile = await client.getProfile();
+                return toolJson({
+                    sid: profile.sid,
+                    uid: profile.uid,
+                    hasGeminiApiKey: !!profile.geminiApiKey,
+                    hasOpenaiApiKey: !!profile.openaiApiKey,
+                });
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.registerTool(
         'flow_list',
         {
             title: 'List Flows',
