@@ -4,7 +4,7 @@ import type { FlowApiClient } from '../api-client';
 import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured, checkNodeStatesViaApi } from '../ws-client';
 import { TERMINAL_STATES } from '../types';
-import { toolError, toolJson } from './helpers';
+import { filterDefined, toolError, toolJson } from './helpers';
 
 const NodeDataSchema = z.object({
   type: z.string().describe('Block process type (e.g., "input-text", "text-transform"). Get from block_list.'),
@@ -97,7 +97,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
         const mermaid = [
           'graph LR',
           ...nodes.map((n) => {
-            const label = n.customLabel ?? n.type ?? n.id;
+            const label = (n.customLabel ?? n.type ?? n.id ?? '').replace(/"/g, "'");
             return `  ${n.id}["${icon(n.status)} ${label}"]`;
           }),
           ...edges.map((e) => `  ${e.sourceNodeId} --> ${e.targetNodeId}`),
@@ -186,6 +186,27 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
   );
 
   server.registerTool(
+    'flow_update',
+    {
+      title: 'Update Flow',
+      description: 'Update flow metadata (name, description) without touching nodes or edges. Safe to use anytime.',
+      inputSchema: z.object({
+        flowId: z.string().describe('Flow ID'),
+        name: z.optional(z.string()).describe('New flow name'),
+        description: z.optional(z.string()).describe('New flow description'),
+      }),
+    },
+    async ({ flowId, name, description }) => {
+      try {
+        const result = await client.upsertFlow(flowId, filterDefined({ name, description }));
+        return toolJson(result);
+      } catch (e) {
+        return toolError(e);
+      }
+    },
+  );
+
+  server.registerTool(
     'flow_save',
     {
       title: 'Save Flow',
@@ -255,14 +276,23 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
           },
         });
 
-        const finalFlow = await client.loadFlow(flowId);
-        const nodes = (finalFlow.nodes ?? []).map((n) => ({
-          id: n.id ?? '',
-          status: nodeStates.get(n.id ?? '') ?? n.status ?? 'UNKNOWN',
-          error: n.errorMessage ?? n.error,
+        // Build result from pre-run flow + WS states; only re-fetch if errors detected
+        const hasError = [...nodeStates.values()].some((s) => s === 'ERROR');
+        let nodes = allNodeIds.map((id) => ({
+          id,
+          status: nodeStates.get(id) ?? 'UNKNOWN',
+          error: undefined as string | undefined,
         }));
 
-        const hasError = nodes.some((n) => n.status === 'ERROR');
+        if (hasError || timedOut) {
+          const finalFlow = await client.loadFlow(flowId);
+          nodes = (finalFlow.nodes ?? []).map((n) => ({
+            id: n.id ?? '',
+            status: nodeStates.get(n.id ?? '') ?? n.status ?? 'UNKNOWN',
+            error: n.errorMessage ?? n.error,
+          }));
+        }
+
         const status = timedOut ? 'timeout' : hasError ? 'error' : 'completed';
 
         return toolJson({

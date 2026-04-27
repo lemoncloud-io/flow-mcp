@@ -73,10 +73,7 @@ export class FlowApiClient {
 
   async upsertFlow(
     id: string,
-    body: {
-      nodes?: Array<Record<string, unknown>>;
-      edges?: Array<Record<string, unknown>>;
-    },
+    body: Record<string, unknown>,
   ): Promise<SaveFlowView> {
     const { data } = await this.client.post(`/flows/${id}/upsert`, body);
     return data;

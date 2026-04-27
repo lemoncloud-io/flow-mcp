@@ -3,9 +3,40 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { FlowApiClient } from '../api-client';
 import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured } from '../ws-client';
-import { toolError, toolJson } from './helpers';
+import { filterDefined, toolError, toolJson } from './helpers';
 
 export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiConfig: FlowApiConfig) => {
+  server.registerTool(
+    'node_create',
+    {
+      title: 'Create Node',
+      description:
+        'Add a new node to an existing flow. Use block_list to get blockId and default config. ' +
+        'Returns the created node with server-assigned ID. Use edge_create after to connect it.',
+      inputSchema: z.object({
+        flowId: z.string().describe('Flow ID to add the node to'),
+        blockId: z.string().describe('Block ID (e.g., "input-text", "buffer"). Get from block_list.'),
+        position: z.optional(z.object({ x: z.number(), y: z.number() })).describe('Canvas position (default: {x:400, y:300})'),
+        config: z.optional(z.record(z.string(), z.string())).describe('Initial config. Keys from block configSchema.'),
+        customLabel: z.optional(z.string()).describe('Display label'),
+      }),
+    },
+    async ({ flowId, blockId, position, config: nodeConfig, customLabel }) => {
+      try {
+        const result = await client.upsertNode('0', flowId, {
+          blockId,
+          position: position ?? { x: 400, y: 300 },
+          config: nodeConfig ?? {},
+          customLabel,
+          autoExecutionEnabled: true,
+        });
+        return toolJson(result);
+      } catch (e) {
+        return toolError(e);
+      }
+    },
+  );
+
   server.registerTool(
     'node_run',
     {
@@ -120,17 +151,10 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
     },
     async ({ nodeId, flowId, customLabel, description, config: nodeConfig, output, position, disabled, blockId, errorMessage, autoExecutionEnabled }) => {
       try {
-        const body: Record<string, unknown> = {};
-        if (customLabel !== undefined) body.customLabel = customLabel;
-        if (description !== undefined) body.description = description;
-        if (nodeConfig !== undefined) body.config = nodeConfig;
-        if (output !== undefined) body.output = output;
-        if (position !== undefined) body.position = position;
-        if (disabled !== undefined) body.disabled = disabled;
-        if (blockId !== undefined) body.blockId = blockId;
-        if (errorMessage !== undefined) body.errorMessage = errorMessage;
-        if (autoExecutionEnabled !== undefined) body.autoExecutionEnabled = autoExecutionEnabled;
-
+        const body = filterDefined({
+          customLabel, description, config: nodeConfig, output, position,
+          disabled, blockId, errorMessage, autoExecutionEnabled,
+        });
         const result = await client.upsertNode(nodeId, flowId, body);
         return toolJson(result);
       } catch (e) {

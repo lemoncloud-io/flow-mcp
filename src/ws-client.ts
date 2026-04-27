@@ -82,7 +82,7 @@ export const executeWithWs = (
     };
 
     let quietTimer: ReturnType<typeof setTimeout> | undefined;
-    const QUIET_PERIOD = 3_000; // settle after 3s of no events
+    const QUIET_PERIOD = 1_500;
 
     const resetQuietTimer = () => {
       if (quietTimer) clearTimeout(quietTimer);
@@ -92,15 +92,11 @@ export const executeWithWs = (
     };
 
     const checkCompletion = () => {
-      // Check if all expected nodes are terminal (fast path)
-      if (expectedNodeIds.length > 0) {
-        const allTerminal = expectedNodeIds.every((id) => {
-          const state = nodeStates.get(id);
-          return state && TERMINAL_STATES.has(state);
-        });
-        if (allTerminal) { settle(false); return; }
-      }
-      // Fallback: quiet period — if no new events for 3s, settle
+      const allTerminal = expectedNodeIds.every((id) => {
+        const state = nodeStates.get(id);
+        return state && TERMINAL_STATES.has(state);
+      });
+      if (allTerminal) { settle(false); return; }
       resetQuietTimer();
     };
 
