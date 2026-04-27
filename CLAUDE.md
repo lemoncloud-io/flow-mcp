@@ -14,10 +14,11 @@ src/
 ├── types.ts            # Domain types (FlowView, NodeData, EdgeData, etc.)
 ├── tools/
 │   ├── helpers.ts      # toolJson(), toolError() response helpers
-│   ├── flow-tools.ts   # 6 flow tools (list/load/create/save/delete/run)
-│   ├── node-tools.ts   # 2 node tools (run/get_port)
+│   ├── flow-tools.ts   # 6 flow tools (list/load/graph/create/save/run)
+│   ├── node-tools.ts   # 6 tools (node_run/get_port/update/delete, edge_create/delete)
 │   ├── block-tools.ts  # 1 block tool (list with cache)
 │   └── index.ts        # barrel export
+├── ws-client.ts        # WebSocket client for real-time execution monitoring
 ├── server.ts           # McpServer setup + registerTool
 ├── stdio.ts            # Entry point: 2-layer console suppression + JSON-RPC filter
 └── index.ts            # Library exports
@@ -30,6 +31,8 @@ src/
 - **Error handling**: tool handlers return `{ isError: true, content: [...] }`, never throw
 - **Stdio safety**: 2-layer protection (console suppression + stdout JSON-RPC filter)
 - **Block cache**: 5-min TTL in `FlowApiClient.listBlocks()`
+- **WebSocket**: Per-call temporary connection for real-time execution monitoring (`ws-client.ts`)
+- **Fallback**: If `FLOW_WS_URL` not set, uses sync `async=0` execution
 
 ## Common Commands
 
@@ -45,14 +48,18 @@ npm test         # Run tests
 
 | Tool | Endpoint |
 |------|----------|
-| flow_list | `GET /flows` |
+| flow_list | `GET /flows` or `GET /public/flows` |
 | flow_load | `GET /flows/:id/load` |
-| flow_create | `POST /flows/0/save` (two-step if edges provided) |
+| flow_graph | Uses `flow_load` data to generate Mermaid diagram |
+| flow_create | `POST /flows/0` + `POST /flows/:id/save` (two-step if edges) |
 | flow_save | `POST /flows/:id/save` |
-| flow_delete | `DELETE /flows/:id` |
-| flow_run | `POST /flows/:id/run?async=0` |
-| node_run | `POST /nodes/:id/run?async=0` |
+| flow_run | `POST /flows/:id/run` + WebSocket monitoring (or `async=0` fallback) |
+| node_run | `POST /nodes/:id/run` + WebSocket monitoring (or `async=0` fallback) |
 | node_get_port | `GET /nodes/:nodeId\::portId@:dir/port` |
+| node_update | `POST /nodes/:id/upsert?flowId=:flowId` |
+| node_delete | Removes node from flow via `flow_save` |
+| edge_create | Adds edge to flow via `flow_save` |
+| edge_delete | Removes edge from flow via `flow_save` |
 | block_list | `GET /blocks/0/list?cores=1` |
 
 ## Conventions

@@ -138,4 +138,78 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
       }
     },
   );
+
+  server.registerTool(
+    'node_delete',
+    {
+      title: 'Delete Node',
+      description: 'Delete one or more nodes from a flow.',
+      inputSchema: z.object({
+        flowId: z.string().describe('Flow ID containing the nodes'),
+        nodeIds: z.array(z.string()).describe('Node IDs to delete'),
+      }),
+      annotations: { destructiveHint: true },
+    },
+    async ({ flowId, nodeIds }) => {
+      try {
+        await client.upsertFlow(flowId, {
+          nodes: nodeIds.map((id) => ({ id: `#${id}` })),
+          edges: [],
+        });
+        return toolJson({ deleted: nodeIds, flowId });
+      } catch (e) {
+        return toolError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    'edge_create',
+    {
+      title: 'Create Edge',
+      description: 'Connect two nodes by creating an edge. Use flow_load to get node IDs and port names.',
+      inputSchema: z.object({
+        flowId: z.string().describe('Flow ID'),
+        sourceNodeId: z.string().describe('Source node ID'),
+        sourcePortId: z.string().describe('Source port ID (e.g., "out")'),
+        targetNodeId: z.string().describe('Target node ID'),
+        targetPortId: z.string().describe('Target port ID (e.g., "in")'),
+      }),
+    },
+    async ({ flowId, sourceNodeId, sourcePortId, targetNodeId, targetPortId }) => {
+      try {
+        const result = await client.upsertFlow(flowId, {
+          nodes: [],
+          edges: [{ id: '', sourceNodeId, sourcePortId, targetNodeId, targetPortId }],
+        });
+        return toolJson(result);
+      } catch (e) {
+        return toolError(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    'edge_delete',
+    {
+      title: 'Delete Edge',
+      description: 'Delete one or more edges from a flow. Get edge IDs from flow_load.',
+      inputSchema: z.object({
+        flowId: z.string().describe('Flow ID'),
+        edgeIds: z.array(z.string()).describe('Edge IDs to delete'),
+      }),
+      annotations: { destructiveHint: true },
+    },
+    async ({ flowId, edgeIds }) => {
+      try {
+        await client.upsertFlow(flowId, {
+          nodes: [],
+          edges: edgeIds.map((id) => ({ id: `#${id}` })),
+        });
+        return toolJson({ deleted: edgeIds, flowId });
+      } catch (e) {
+        return toolError(e);
+      }
+    },
+  );
 };

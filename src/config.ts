@@ -3,10 +3,10 @@ import dotenv from 'dotenv';
 import { logger } from './logger';
 
 const configSchema = z.object({
-  FLOW_API_URL: z.url().describe('Eureka Flows API base URL'),
+  FLOW_API_URL: z.url().default('https://api.eureka.codes/flw-v1').describe('Eureka Flows API base URL'),
   FLOW_API_KEY: z.string().min(1).describe('API key for authentication'),
   FLOW_API_TIMEOUT: z.optional(z.coerce.number()).default(30000),
-  FLOW_WS_URL: z.optional(z.string()).describe('WebSocket endpoint (e.g., wss://wss.eureka.codes/wss-d1)'),
+  FLOW_WS_URL: z.optional(z.string()).default('wss://wss.eureka.codes/wss-v1').describe('WebSocket endpoint'),
 });
 
 export type FlowApiConfig = z.infer<typeof configSchema>;

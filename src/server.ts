@@ -17,11 +17,12 @@ export const createServer = (): { run: () => Promise<void> } => {
       capabilities: { tools: {} },
       instructions:
         'Eureka Flow MCP server. Typical workflow: ' +
-        '1) block_list to discover available block types, ' +
-        '2) flow_create to build a new flow with nodes, ' +
-        '3) flow_run or node_run to execute, ' +
-        '4) node_get_port to inspect results. ' +
-        'Always flow_load before flow_save to avoid data loss.',
+        '1) block_list → discover block types, ' +
+        '2) flow_create → build a new flow, ' +
+        '3) flow_run/node_run → execute, ' +
+        '4) node_get_port → inspect results. ' +
+        'IMPORTANT: To modify existing flows, use node_update (change config/label) and node_delete (remove nodes). ' +
+        'Do NOT use flow_save for modifications — it replaces ALL nodes with new IDs, breaking edges.',
     },
   );
 
