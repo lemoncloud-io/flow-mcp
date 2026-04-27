@@ -1,40 +1,66 @@
-# flow-mcp
+<p align="center">
+  <img src="docs/eurekaflow logo.png" alt="Eureka Flow" height="60" />
+</p>
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?style=flat-square)](https://www.typescriptlang.org/)
-[![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.29-green?style=flat-square)](https://modelcontextprotocol.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
+<h1 align="center">flow-mcp</h1>
 
-[Eureka Flow](https://flow.eureka.codes)를 Claude에서 바로 사용할 수 있게 해주는 MCP 서버입니다.
+<p align="center">
+  <a href="https://www.npmjs.com/package/@lemoncloud/flow-mcp"><img src="https://img.shields.io/npm/v/@lemoncloud/flow-mcp?style=flat-square" alt="npm" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.9-blue?style=flat-square" alt="TypeScript" /></a>
+  <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP_SDK-1.29-green?style=flat-square" alt="MCP SDK" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-yellow?style=flat-square" alt="License" /></a>
+</p>
 
-> 자연어로 워크플로우를 만들고, 실행하고, 결과를 확인하세요.
+<p align="center">
+  MCP server for <a href="https://flow.eureka.codes"><b>Eureka Flow</b></a> — manage visual workflows from Claude Desktop.<br/>
+  Build, execute, and monitor data processing pipelines through natural language.
+</p>
 
-## 이런 걸 할 수 있어요
+<p align="center">
+  <a href="README.ko.md">한국어</a>
+</p>
 
-Claude에게 이렇게 말하면 됩니다:
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-dark.jpg" />
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/screenshot-light.jpg" />
+    <img src="docs/images/screenshot-dark.jpg" alt="Eureka Flow" width="100%" />
+  </picture>
+</p>
 
-| 하고 싶은 일 | Claude에게 이렇게 말하세요 |
-|-------------|------------------------|
-| 워크플로우 목록 보기 | "내 flow 목록 보여줘" |
-| 새 워크플로우 만들기 | "텍스트 입력 → 버퍼 → 미리보기 flow 만들어줘" |
-| 워크플로우 실행 | "1004897 flow 실행해봐" |
-| 실행 결과 확인 | "미리보기 노드의 출력값 보여줘" |
-| 구조 시각화 | "1004897 그래프 보여줘" |
-| 노드 수정 | "1009369 노드 이름을 EurekaFlow로 바꿔" |
-| 노드 추가 | "이 flow에 텍스트 입력 블록 하나 추가해줘" |
-| 연결 | "입력 노드와 버퍼 노드를 연결해줘" |
-| 삭제 | "연결 안 된 노드 정리해줘" |
+## What You Can Do
 
-코드를 몰라도, 도구 이름을 몰라도 됩니다. 자연어로 요청하면 Claude가 알아서 처리합니다.
+Just talk to Claude:
 
-## 시작하기
+| What you want | Say this to Claude |
+|---------------|-------------------|
+| List workflows | "Show my flows" |
+| Create a workflow | "Create a flow: text input → buffer → preview" |
+| Run a workflow | "Run flow 1004897" |
+| Check results | "Show the preview node output" |
+| Visualize | "Show graph for 1004897" |
+| Rename a node | "Rename node 1009369 to EurekaFlow" |
+| Add a node | "Add a text input block to this flow" |
+| Connect nodes | "Connect the input node to the buffer" |
+| Clean up | "Delete disconnected nodes" |
 
-### 1단계: API 키 발급
+No code required. No tool names to remember. Just ask in natural language.
 
-[Eureka Codes 콘솔](https://console.eureka.codes)에서 API 키를 발급받으세요.
+## Quick Start
 
-### 2단계: Claude Desktop 설정
+### Step 1: Install
 
-`~/Library/Application Support/Claude/claude_desktop_config.json` 파일에 아래 내용을 추가합니다:
+```bash
+npm install -g @lemoncloud/flow-mcp
+```
+
+### Step 2: Get an API Key
+
+Get your API key from [Eureka Codes Console](https://console.eureka.codes).
+
+### Step 3: Configure Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -43,100 +69,100 @@ Claude에게 이렇게 말하면 됩니다:
       "command": "npx",
       "args": ["-y", "@lemoncloud/flow-mcp"],
       "env": {
-        "FLOW_API_KEY": "발급받은-API-키"
+        "FLOW_API_KEY": "your-api-key"
       }
     }
   }
 }
 ```
 
-### 3단계: 시작!
+### Step 4: Go!
 
-Claude Desktop을 재시작하고 **"내 flow 목록 보여줘"** 라고 말해보세요.
+Restart Claude Desktop and say **"Show my flows"**.
 
-> **참고:** `FLOW_API_KEY`만 있으면 바로 사용할 수 있습니다. API URL과 WebSocket URL은 기본값이 설정되어 있습니다.
+> **Note:** Only `FLOW_API_KEY` is required. API URL has a sensible default.
 
-### 설정 옵션
+### Configuration
 
-| 환경변수 | 필수 | 기본값 | 설명 |
-|---------|:---:|--------|------|
-| `FLOW_API_KEY` | O | — | API 인증 키 |
-| `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API 서버 주소 |
-| `FLOW_API_TIMEOUT` | | `30000` | API 요청 타임아웃 (ms) |
-| `FLOW_WS_URL` | | — | WebSocket 주소. 설정하면 실행 중 실시간 진행상황을 볼 수 있습니다. |
+| Variable | Required | Default | Description |
+|----------|:--------:|---------|-------------|
+| `FLOW_API_KEY` | Yes | — | API authentication key |
+| `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API server URL |
+| `FLOW_API_TIMEOUT` | | `30000` | Request timeout (ms) |
+| `FLOW_WS_URL` | | — | WebSocket URL for real-time execution monitoring |
 
-## 사용 예시
+> **Tip:** Set `FLOW_WS_URL` to enable live progress tracking during `flow_run` and `node_run`.
 
-### 워크플로우 만들기
+## Examples
 
-```
-"사용 가능한 블록 보여줘"
-→ block_list 호출 → 입력/처리/출력 블록 목록 표시
-
-"텍스트 입력, 3초 버퍼, 미리보기로 연결된 flow 만들어줘"
-→ flow_create 호출 → 노드 3개 + 엣지 2개 자동 생성
-
-"만든 flow 실행해봐"
-→ flow_run 호출 → 실시간 진행상황 표시 → 결과 반환
-```
-
-### 기존 워크플로우 수정
+### Create & Run
 
 ```
-"1004897 flow 로드해줘"
-→ flow_load → 노드, 엣지, 포트 데이터 표시
+"Show available blocks"
+→ Lists input / process / output block types
 
-"입력 노드의 텍스트를 Hello Eureka로 바꿔"
-→ node_update → config.text 변경
+"Create a flow with text input, 3s buffer, and preview connected together"
+→ Creates 3 nodes + 2 edges automatically
 
-"여기에 출력 블록 하나 더 추가하고 연결해줘"
-→ node_create + edge_create → 새 노드 추가 + 연결
-
-"그래프 보여줘"
-→ flow_graph → Mermaid 다이어그램 표시
+"Run the flow"
+→ Shows real-time progress → returns results
 ```
 
-### 실행 결과 분석
+### Modify Existing Flows
 
 ```
-"전체 실행해봐"
-→ flow_run → 각 노드별 진행상황 + 완료 여부 표시
+"Load flow 1004897"
+→ Shows nodes, edges, port data
 
-"미리보기 노드의 출력값은?"
-→ node_get_port → 포트 데이터 (값, 타입, 타임스탬프)
+"Change the input text to Hello Eureka"
+→ Updates config.text
+
+"Add another output block and connect it"
+→ Creates node + edge
+
+"Show graph"
+→ Mermaid diagram
 ```
 
-## 15개 도구 전체 목록
+### Inspect Results
 
-자연어로 요청하면 Claude가 자동으로 적절한 도구를 선택합니다.
+```
+"Run the whole flow"
+→ Per-node progress + completion status
 
-| 도구 | 하는 일 |
-|------|--------|
-| `block_list` | 사용 가능한 블록 종류 조회 |
-| `flow_list` | 내 워크플로우 목록 |
-| `flow_load` | 워크플로우 상세 로드 (노드, 엣지, 포트) |
-| `flow_graph` | Mermaid 다이어그램 시각화 |
-| `flow_create` | 새 워크플로우 생성 (노드+엣지 한 번에) |
-| `flow_update` | 워크플로우 이름/설명 변경 |
-| `flow_save` | 전체 재구성 (주의: 기존 노드 ID 변경됨) |
-| `flow_run` | 워크플로우 실행 + 실시간 모니터링 |
-| `flow_delete` | 워크플로우 삭제 |
-| `node_create` | 기존 flow에 노드 추가 |
-| `node_run` | 단일 노드 실행 |
-| `node_get_port` | 노드 입출력 데이터 조회 |
-| `node_update` | 노드 설정/라벨/위치 등 수정 |
-| `node_delete` | 노드 삭제 |
-| `edge_create` | 두 노드 연결 |
-| `edge_delete` | 연결 제거 |
+"What's the preview node output?"
+→ Port data (value, type, timestamp)
+```
+
+## 15 Tools
+
+Claude automatically selects the right tool based on your request.
+
+| Tool | What it does |
+|------|-------------|
+| `block_list` | List available block types |
+| `flow_list` | List your workflows |
+| `flow_load` | Load full flow state (nodes, edges, ports) |
+| `flow_graph` | Mermaid diagram visualization |
+| `flow_create` | Create new flow (nodes + edges at once) |
+| `flow_update` | Update flow name / description |
+| `flow_save` | Full rebuild (caution: reassigns node IDs) |
+| `flow_run` | Execute flow + real-time monitoring |
+| `flow_delete` | Delete a flow |
+| `node_create` | Add node to existing flow |
+| `node_run` | Execute single node |
+| `node_get_port` | Inspect node input/output data |
+| `node_update` | Update node config / label / position |
+| `node_delete` | Delete a node |
+| `edge_create` | Connect two nodes |
+| `edge_delete` | Remove a connection |
 
 ---
 
-## For Developers
-
 <details>
-<summary>개발 환경 설정 및 아키텍처</summary>
+<summary><b>Developer Guide</b></summary>
 
-### 설치
+### Build from Source
 
 ```bash
 git clone https://github.com/lemoncloud-io/flow-mcp.git
@@ -145,17 +171,19 @@ npm install
 npm run build
 ```
 
-### 개발 명령어
+### Commands
 
-| 명령어 | 설명 |
-|--------|------|
-| `npm run build` | TypeScript 컴파일 |
-| `npm run dev` | Watch 모드 |
-| `npm run lint` | 타입 체크 (`tsc --noEmit`) |
-| `npm start` | MCP 서버 실행 (stdio) |
-| `npm test` | 테스트 |
+| Command | Description |
+|---------|-------------|
+| `npm run build` | TypeScript compilation |
+| `npm run dev` | Watch mode |
+| `npm run lint` | ESLint |
+| `npm run lint:type` | Type check (`tsc --noEmit`) |
+| `npm run format` | Prettier format |
+| `npm start` | Run MCP server (stdio) |
+| `npm test` | Run tests |
 
-### 로컬 빌드로 Claude Desktop 연결
+### Local Build Config
 
 ```json
 {
@@ -172,7 +200,7 @@ npm run build
 }
 ```
 
-### 아키텍처
+### Architecture
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
@@ -183,23 +211,29 @@ stdio.ts (console suppression + JSON-RPC filter)
       -> config.ts (Zod v4 env validation)
 ```
 
-### WebSocket 실행 흐름
+### WebSocket Execution Flow
 
 ```
-1. WS 연결 (info= 파라미터 → connectionId 수신)
-2. 실행 트리거 (POST /nodes/:id/run?connection=<connId>)
-3. 이벤트 모니터링 (노드 상태 + 포트 업데이트)
-4. 완료 감지 (전체 terminal 또는 1.5초 quiet period)
-5. 전체 이벤트 로그 포함하여 결과 반환
+1. Connect WS (info= param -> connectionId)
+2. Trigger run (POST /nodes/:id/run?connection=<connId>)
+3. Monitor events (node status + port updates)
+4. Settle on completion (all terminal) or quiet period (1.5s)
+5. Return result with full event log
+```
+
+### Publish
+
+```bash
+npm run build
+npm publish --access public
 ```
 
 </details>
 
 ## Related Projects
 
-- [Eureka Flow](https://github.com/lemoncloud-io/eureka-flow) — 비주얼 워크플로우 에디터 (프론트엔드)
-- [eureka-flows-api](https://github.com/lemoncloud-io/eureka-flows-api) — 플로우 실행 엔진 (백엔드)
+- [Eureka Flow](https://github.com/lemoncloud-io/eureka-flow) — Visual workflow editor (frontend)
 
 ## License
 
-MIT -- [LemonCloud](https://lemoncloud.io)
+Apache-2.0 -- [LemonCloud](https://lemoncloud.io)

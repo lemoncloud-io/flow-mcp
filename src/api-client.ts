@@ -53,11 +53,6 @@ export class FlowApiClient {
         return data;
     }
 
-    async createFlow(body: { name: string; description?: string }): Promise<FlowView> {
-        const { data } = await this.client.post('/flows/0', body);
-        return data;
-    }
-
     async saveFlow(id: string, body: SaveFlowBody): Promise<SaveFlowView> {
         const { data } = await this.client.post(`/flows/${id}/save`, body);
         return data;

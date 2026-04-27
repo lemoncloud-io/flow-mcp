@@ -109,7 +109,6 @@ export const makeListResult = <T>(list: T[], total?: number): ListResult<T> => (
 export const makeApiClient = () => ({
   listFlows: vi.fn(),
   loadFlow: vi.fn(),
-  createFlow: vi.fn(),
   saveFlow: vi.fn(),
   runFlow: vi.fn(),
   runNode: vi.fn(),

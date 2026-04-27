@@ -82,19 +82,6 @@ describe('FlowApiClient', () => {
     });
   });
 
-  describe('createFlow', () => {
-    it('should call POST /flows/0', async () => {
-      const { client, axiosInstance } = createClient();
-      const created = makeFlow({ id: 'new-1' });
-      vi.spyOn(axiosInstance, 'post').mockResolvedValue({ data: created });
-
-      const result = await client.createFlow({ name: 'New Flow' });
-
-      expect(axiosInstance.post).toHaveBeenCalledWith('/flows/0', { name: 'New Flow' });
-      expect(result).toEqual(created);
-    });
-  });
-
   describe('saveFlow', () => {
     it('should call POST /flows/:id/save', async () => {
       const { client, axiosInstance } = createClient();
