@@ -13,7 +13,9 @@ src/
 ├── api-client.ts       # Axios client for eureka-flows-api + block cache
 ├── types.ts            # Domain types (FlowView, NodeData, EdgeData, etc.)
 ├── tools/
-│   ├── helpers.ts      # toolJson(), toolError() response helpers
+│   ├── helpers.ts      # toolResult(), toolError(), mcpLog() response/logging helpers
+│   ├── schemas.ts      # Zod output schemas for structuredContent validation
+│   ├── completions.ts  # completable() auto-completion for flowId, blockType, stereo
 │   ├── flow-tools.ts   # 11 flow tools (profile/list/load/graph/create/update/save/run/clone/export/run_from)
 │   ├── node-tools.ts   # 8 tools (get/create/run/get_port/update/delete, edge_create/delete)
 │   ├── block-tools.ts  # 2 block tools (get/list with cache)
@@ -29,7 +31,10 @@ src/
 
 - **MCP SDK v1.29** with v2 API (`McpServer` + `registerTool`)
 - **Zod v4** for input schemas (`import * as z from 'zod/v4'`)
-- **Error handling**: tool handlers return `{ isError: true, content: [...] }`, never throw
+- **Error handling**: tool handlers return `{ isError: true, content: [...], structuredContent: { error, code? } }`, never throw
+- **Structured output**: all tools declare `outputSchema` + return `structuredContent` via `toolResult()`
+- **Auto-completion**: `completable()` on flowId (30s cache), blockType (uses block cache), stereo fields
+- **Server logging**: `mcpLog()` sends `notifications/message` to MCP client during execution tools
 - **Stdio safety**: 2-layer protection (console suppression + stdout JSON-RPC filter)
 - **Block cache**: 5-min TTL in `FlowApiClient.listBlocks()`
 - **WebSocket**: Per-call temporary connection for real-time execution monitoring (`ws-client.ts`)
