@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/eurekaflow logo.png" alt="Eureka Flow" height="60" />
+  <img src="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/logo.png" alt="Eureka Flow" height="60" />
 </p>
 
 <h1 align="center">flow-mcp</h1>
@@ -22,9 +22,9 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-dark.jpg" />
-    <source media="(prefers-color-scheme: light)" srcset="docs/images/screenshot-light.jpg" />
-    <img src="docs/images/screenshot-dark.jpg" alt="Eureka Flow" width="100%" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-dark.jpg" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-light.jpg" />
+    <img src="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-dark.jpg" alt="Eureka Flow" width="100%" />
   </picture>
 </p>
 
@@ -93,9 +93,7 @@ Restart your client and say **"Show my flows"**.
 | `FLOW_API_KEY` | Yes | — | API authentication key |
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API server URL |
 | `FLOW_API_TIMEOUT` | | `30000` | Request timeout (ms) |
-| `FLOW_WS_URL` | | — | WebSocket URL for real-time execution monitoring |
-
-> **Tip:** Set `FLOW_WS_URL` to enable live progress tracking during `flow_run` and `node_run`.
+| `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket URL for real-time execution monitoring |
 
 ## Examples
 
@@ -138,7 +136,7 @@ Restart your client and say **"Show my flows"**.
 → Port data (value, type, timestamp)
 ```
 
-## 16 Tools
+## 23 Tools
 
 Claude automatically selects the right tool based on your request.
 
@@ -146,14 +144,18 @@ Claude automatically selects the right tool based on your request.
 |------|-------------|
 | `profile_get` | Check API key configuration status |
 | `block_list` | List available block types |
-| `flow_list` | List your workflows |
+| `block_get` | Get block details by ID or name |
+| `flow_list` | List your workflows (with pagination) |
 | `flow_load` | Load full flow state (nodes, edges, ports) |
 | `flow_graph` | Mermaid diagram visualization |
 | `flow_create` | Create new flow (nodes + edges at once) |
 | `flow_update` | Update flow name / description |
 | `flow_save` | Full rebuild (caution: reassigns node IDs) |
+| `flow_clone` | Duplicate a flow |
+| `flow_export` | Export flow as portable JSON |
 | `flow_run` | Execute flow + real-time monitoring |
-| `flow_delete` | Delete a flow |
+| `flow_run_from` | Run flow from a specific node |
+| `node_get` | Get single node details |
 | `node_create` | Add node to existing flow |
 | `node_run` | Execute single node |
 | `node_get_port` | Inspect node input/output data |
@@ -161,6 +163,8 @@ Claude automatically selects the right tool based on your request.
 | `node_delete` | Delete a node |
 | `edge_create` | Connect two nodes |
 | `edge_delete` | Remove a connection |
+| `run_list` | List execution history with token usage |
+| `run_get` | Get execution run details |
 
 ---
 
@@ -209,7 +213,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 16 tools)
+  -> server.ts (McpServer + 23 tools)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)

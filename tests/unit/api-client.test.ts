@@ -46,7 +46,7 @@ describe('FlowApiClient', () => {
 
       const result = await client.listFlows();
 
-      expect(axiosInstance.get).toHaveBeenCalledWith('/flows');
+      expect(axiosInstance.get).toHaveBeenCalledWith('/flows', { params: {} });
       expect(result).toEqual(data);
     });
 
@@ -56,7 +56,7 @@ describe('FlowApiClient', () => {
 
       await client.listFlows({ isPublic: true });
 
-      expect(axiosInstance.get).toHaveBeenCalledWith('https://api.example.com/public/flows');
+      expect(axiosInstance.get).toHaveBeenCalledWith('https://api.example.com/public/flows', { params: {} });
     });
 
     it('should call GET /flows when isPublic is false', async () => {
@@ -65,7 +65,7 @@ describe('FlowApiClient', () => {
 
       await client.listFlows({ isPublic: false });
 
-      expect(axiosInstance.get).toHaveBeenCalledWith('/flows');
+      expect(axiosInstance.get).toHaveBeenCalledWith('/flows', { params: {} });
     });
   });
 

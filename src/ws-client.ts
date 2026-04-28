@@ -4,11 +4,20 @@ import type { FlowApiConfig } from './config';
 import type { FlowApiClient } from './api-client';
 import { TERMINAL_STATES } from './types';
 
+export interface ProgressEvent {
+    completedCount: number;
+    totalCount: number;
+    nodeId: string;
+    state: string;
+    elapsed: number;
+}
+
 interface WaitForCompletionParams {
     flowId: string;
     expectedNodeIds: string[];
     triggerRun: (connectionId: string) => Promise<void>;
     timeout?: number;
+    onProgress?: (event: ProgressEvent) => void;
 }
 
 /** Check if all expected nodes are terminal via API snapshot */
@@ -51,6 +60,7 @@ export const executeWithWs = (
         const eventLog: Array<Record<string, unknown>> = [];
         const startTs = Date.now();
         let settled = false;
+        let terminalCount = 0;
         // eslint-disable-next-line prefer-const -- reassigned via setTimeout at end of scope
         let timer: ReturnType<typeof setTimeout> | undefined;
         let quietTimer: ReturnType<typeof setTimeout> | undefined;
@@ -123,8 +133,9 @@ export const executeWithWs = (
         const ws = new WebSocket(url);
 
         ws.on('error', err => {
-            logger.error('WebSocket error:', err);
-            fail(new Error(`WebSocket connection failed: ${err.message}`));
+            const safeMsg = err.message.replace(/x-api-key=[^&]+/, 'x-api-key=***');
+            logger.error('WebSocket error:', safeMsg);
+            fail(new Error(`WebSocket connection failed: ${safeMsg}`));
         });
 
         ws.on('close', () => {
@@ -147,8 +158,19 @@ export const executeWithWs = (
                 eventLog.push({ elapsed: Date.now() - startTs, ...d });
 
                 if (d.type === 'node' && typeof d.id === 'string' && typeof d.state === 'string') {
+                    const prevState = nodeStates.get(d.id);
                     nodeStates.set(d.id, d.state);
+                    if (TERMINAL_STATES.has(d.state) && (!prevState || !TERMINAL_STATES.has(prevState))) {
+                        terminalCount++;
+                    }
                     logger.debug(`Node ${d.id}: ${d.state} (${d.stage ?? ''})`);
+                    params.onProgress?.({
+                        completedCount: terminalCount,
+                        totalCount: expectedNodeIds.length,
+                        nodeId: d.id,
+                        state: d.state,
+                        elapsed: Date.now() - startTs,
+                    });
                     checkCompletion();
                 }
             } catch {

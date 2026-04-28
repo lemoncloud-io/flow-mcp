@@ -2,6 +2,8 @@
 
 export interface ListResult<T> {
     total: number;
+    limit?: number;
+    offset?: number;
     list: T[];
 }
 
@@ -166,6 +168,31 @@ export interface ProfileView {
     uid: string;
     geminiApiKey?: string;
     openaiApiKey?: string;
+}
+
+export interface TokenUsage {
+    inputToken?: number;
+    outputToken?: number;
+    totalToken?: number;
+    milliCost?: number;
+}
+
+export interface RunView {
+    id: string;
+    stereo?: string;
+    name?: string;
+    parentId?: string;
+    rootId?: string;
+    flowId?: string;
+    nodeId?: string;
+    childNo?: number;
+    model?: string;
+    usage$?: TokenUsage;
+    executedAt?: number;
+    finishedAt?: number;
+    elapsedMs?: number;
+    createdAt?: number;
+    updatedAt?: number;
 }
 
 export const TERMINAL_STATES = new Set(['COMPLETED', 'ERROR', 'SKIPPED']);

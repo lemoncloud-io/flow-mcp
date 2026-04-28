@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-flow-mcp is an MCP (Model Context Protocol) server that provides AI assistants with tools to manage Eureka Flow visual workflows. It acts as a stateless proxy between MCP clients (Claude Desktop) and the eureka-flows-api backend.
+flow-mcp is an MCP (Model Context Protocol) server that provides AI assistants with tools to manage Eureka Flow visual workflows. It acts as a stateless proxy between MCP clients (Claude Desktop, Cursor, etc.) and the eureka-flows-api backend.
 
 ## Architecture
 
@@ -14,13 +14,14 @@ src/
 ├── types.ts            # Domain types (FlowView, NodeData, EdgeData, etc.)
 ├── tools/
 │   ├── helpers.ts      # toolJson(), toolError() response helpers
-│   ├── flow-tools.ts   # 8 flow tools (profile/list/load/graph/create/update/save/run)
-│   ├── node-tools.ts   # 7 tools (create/run/get_port/update/delete, edge_create/delete)
-│   ├── block-tools.ts  # 1 block tool (list with cache)
+│   ├── flow-tools.ts   # 11 flow tools (profile/list/load/graph/create/update/save/run/clone/export/run_from)
+│   ├── node-tools.ts   # 8 tools (get/create/run/get_port/update/delete, edge_create/delete)
+│   ├── block-tools.ts  # 2 block tools (get/list with cache)
+│   ├── run-tools.ts    # 2 run tools (list/get execution history)
 │   └── index.ts        # barrel export
-├── ws-client.ts        # WebSocket client for real-time execution monitoring
+├── ws-client.ts        # WebSocket client for real-time execution monitoring + progress callbacks
 ├── server.ts           # McpServer setup + registerTool
-├── stdio.ts            # Entry point: 2-layer console suppression + JSON-RPC filter
+├── stdio.ts            # Entry point: --help flag + 2-layer console suppression + JSON-RPC filter
 └── index.ts            # Library exports
 ```
 
@@ -32,13 +33,15 @@ src/
 - **Stdio safety**: 2-layer protection (console suppression + stdout JSON-RPC filter)
 - **Block cache**: 5-min TTL in `FlowApiClient.listBlocks()`
 - **WebSocket**: Per-call temporary connection for real-time execution monitoring (`ws-client.ts`)
+- **Progress**: `onProgress` callback in WS client → MCP `notifications/progress` via `extra.sendNotification`
 - **Fallback**: If `FLOW_WS_URL` not set, uses sync `async=0` execution
 
 ## Common Commands
 
 ```bash
 npm run build    # TypeScript compilation
-npm run lint     # Type check (tsc --noEmit)
+npm run lint     # ESLint
+npm run lint:type # Type check (tsc --noEmit)
 npm run dev      # Watch mode
 npm start        # Run MCP server (stdio)
 npm test         # Run tests
@@ -53,9 +56,13 @@ npm test         # Run tests
 | flow_load | `GET /flows/:id/load` |
 | flow_graph | Uses `flow_load` data to generate Mermaid diagram |
 | flow_create | `POST /flows/0/save` (two-step if edges) |
+| flow_clone | `GET /flows/:id/load` + `POST /flows/0/save` (two-step) |
+| flow_export | `GET /flows/:id/load` (returns clean JSON) |
 | flow_update | `POST /flows/:id/upsert` (metadata only) |
 | flow_save | `POST /flows/:id/save` (full replace — use with caution) |
 | flow_run | Start nodes with `POST /nodes/:id/run?propagate=1` + WebSocket |
+| flow_run_from | `POST /nodes/:id/run?propagate=1` from specific node + WebSocket |
+| node_get | `GET /nodes/:id` |
 | node_create | `POST /nodes/0/upsert?flowId=:flowId` |
 | node_run | `POST /nodes/:id/run` + WebSocket monitoring |
 | node_get_port | `GET /nodes/:nodeId\::portId@:dir/port` |
@@ -63,7 +70,10 @@ npm test         # Run tests
 | node_delete | `POST /flows/:id/upsert` with `#` prefix |
 | edge_create | `POST /flows/:id/upsert` |
 | edge_delete | `POST /flows/:id/upsert` with `#` prefix |
+| block_get | `GET /blocks/:id` (by ID or name) |
 | block_list | `GET /blocks/0/list?cores=1` (cached 5min) |
+| run_list | `GET /runs` (execution history) |
+| run_get | `GET /runs/:id` (run details + token usage) |
 
 ## Conventions
 

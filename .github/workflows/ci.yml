@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [develop, main]
+    branches: [main]
 
 jobs:
   test:
@@ -12,10 +12,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: 'npm'
 
       - run: npm ci
-      - run: npm run build
       - run: npm run lint
+      - run: npm run lint:type
       - run: npm test
+      - run: npm run build

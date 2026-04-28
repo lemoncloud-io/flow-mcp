@@ -8,15 +8,16 @@ import type {
   PortData,
   PortDefinition,
   NodeView,
+  RunView,
   ListResult,
 } from '../../src/types';
-import type { FlowApiConfig } from '../../src/config';
+import { type FlowApiConfig, DEFAULT_WS_URL } from '../../src/config';
 
 export const makeConfig = (overrides?: Partial<FlowApiConfig>): FlowApiConfig => ({
   FLOW_API_URL: 'https://api.example.com',
   FLOW_API_KEY: 'test-key-123',
   FLOW_API_TIMEOUT: 30000,
-  FLOW_WS_URL: undefined,
+  FLOW_WS_URL: DEFAULT_WS_URL,
   ...overrides,
 });
 
@@ -92,6 +93,18 @@ export const makeBlock = (overrides?: Partial<BlockView>): BlockView => ({
   ...overrides,
 });
 
+export const makeRun = (overrides?: Partial<RunView>): RunView => ({
+  id: 'run-1',
+  flowId: 'flow-1',
+  nodeId: 'node-1',
+  model: 'gemini-2.0-flash',
+  usage$: { inputToken: 100, outputToken: 50, totalToken: 150 },
+  executedAt: 1700000000000,
+  finishedAt: 1700000001000,
+  elapsedMs: 1000,
+  ...overrides,
+});
+
 export const makePortData = (overrides?: Partial<PortData>): PortData => ({
   id: 'port-1',
   nodeId: 'node-1',
@@ -107,13 +120,20 @@ export const makeListResult = <T>(list: T[], total?: number): ListResult<T> => (
 });
 
 export const makeApiClient = () => ({
+  getProfile: vi.fn(),
   listFlows: vi.fn(),
   loadFlow: vi.fn(),
   saveFlow: vi.fn(),
+  upsertFlow: vi.fn(),
   runFlow: vi.fn(),
+  getNode: vi.fn(),
   runNode: vi.fn(),
+  upsertNode: vi.fn(),
   getPortData: vi.fn(),
+  getBlock: vi.fn(),
   listBlocks: vi.fn(),
+  listRuns: vi.fn(),
+  getRun: vi.fn(),
 });
 
 export type MockApiClient = ReturnType<typeof makeApiClient>;

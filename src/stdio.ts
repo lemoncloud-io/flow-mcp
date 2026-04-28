@@ -1,5 +1,32 @@
 #!/usr/bin/env node
 
+// Handle --help before suppressing console
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    process.stdout.write(
+        [
+            'flow-mcp - MCP server for Eureka Flow visual workflows',
+            '',
+            'Usage:',
+            '  npx @lemoncloud/flow-mcp         Start MCP server (stdio transport)',
+            '  flow-mcp --help                   Show this help',
+            '',
+            'Environment Variables (required):',
+            '  FLOW_API_KEY      API key for Eureka Flows API',
+            '',
+            'Environment Variables (optional):',
+            '  FLOW_API_URL      API base URL (default: https://api.eureka.codes/flw-v1)',
+            '  FLOW_WS_URL       WebSocket URL for real-time monitoring',
+            '  FLOW_API_TIMEOUT  API timeout in ms (default: 30000)',
+            '',
+            'Configuration:',
+            '  Set env vars in your MCP client config or .env file.',
+            '  See: https://github.com/lemoncloud-io/flow-mcp#readme',
+            '',
+        ].join('\n'),
+    );
+    process.exit(0);
+}
+
 // === Layer 1: Suppress all console.* methods ===
 const noop = () => {};
 for (const method of [

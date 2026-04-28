@@ -13,7 +13,7 @@ const captureHandlers = (mockClient: MockApiClient) => {
     }),
   } as unknown as McpServer;
 
-  registerNodeTools(mockServer, mockClient as never, makeConfig());
+  registerNodeTools(mockServer, mockClient as never, makeConfig({ FLOW_WS_URL: '' }));
   return handlers;
 };
 

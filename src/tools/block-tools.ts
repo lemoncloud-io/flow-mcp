@@ -6,6 +6,28 @@ import type { BlockView } from '../types';
 
 export const registerBlockTools = (server: McpServer, client: FlowApiClient) => {
     server.registerTool(
+        'block_get',
+        {
+            title: 'Get Block',
+            description:
+                'Get block definition by ID or name (e.g. "input-text", "text-transform"). ' +
+                'Returns full port specs and config schema. Use block_list first to discover available blocks.',
+            inputSchema: z.object({
+                blockId: z.string().describe('Block ID (numeric) or name (e.g. "input-text", "text-transform")'),
+            }),
+            annotations: { readOnlyHint: true },
+        },
+        async ({ blockId }) => {
+            try {
+                const result = await client.getBlock(blockId);
+                return toolJson(summarizeBlock(result));
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.registerTool(
         'block_list',
         {
             title: 'List Blocks',
