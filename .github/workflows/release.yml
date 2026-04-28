@@ -90,7 +90,7 @@ jobs:
                             "type": "section",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": ":npm: *@lemoncloud/flow-mcp* `v${{ steps.version.outputs.version }}` npm 배포 완료\n• <https://www.npmjs.com/package/@lemoncloud/flow-mcp|npm package> | <https://github.com/${{ github.repository }}/releases|Release Notes>"
+                                "text": "*@lemoncloud/flow-mcp* `v${{ steps.version.outputs.version }}` npm 배포 완료\n• <https://www.npmjs.com/package/@lemoncloud/flow-mcp|npm package> | <https://github.com/${{ github.repository }}/releases|Release Notes>"
                             }
                         },
                         {
