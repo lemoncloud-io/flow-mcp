@@ -79,18 +79,18 @@ jobs:
           token: ${{ secrets.RELEASE_BOT_TOKEN }}
           payload: |
             channel: ${{ secrets.EUREKACODES_CHANNEL }}
-            text: ":npm: flow-mcp npm publish 알림"
+            text: ":npm: Publish 알림"
             unfurl_links: false
             unfurl_media: false
             attachments: [
                 {
-                    "color": "#CB3837",
+                    "color": "#36a64f",
                     "blocks": [
                         {
                             "type": "section",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": ":npm: *@lemoncloud/flow-mcp* `v${{ steps.version.outputs.version }}` npm 배포 완료\n• <https://www.npmjs.com/package/@lemoncloud/flow-mcp|npm package> | <https://github.com/${{ github.repository }}/releases|Release Notes>"
+                                "text": "*@lemoncloud/flow-mcp* `v${{ steps.version.outputs.version }}` npm 배포 완료\n• <https://www.npmjs.com/package/@lemoncloud/flow-mcp|npm package> | <https://github.com/${{ github.repository }}/releases|Release Notes>"
                             }
                         },
                         {

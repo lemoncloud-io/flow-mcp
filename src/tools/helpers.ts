@@ -1,3 +1,4 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ServerNotification } from '@modelcontextprotocol/sdk/types.js';
 import type { ProgressEvent } from '../ws-client';
 import type { NodeData } from '../types';
@@ -5,20 +6,21 @@ import type { NodeData } from '../types';
 export const filterDefined = (obj: Record<string, unknown>): Record<string, unknown> =>
     Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
 
-export const toolJson = (data: unknown) => ({
+/** Return both human-readable text and structured content for tools with outputSchema */
+export const toolResult = (data: object) => ({
     content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+    structuredContent: data as Record<string, unknown>,
 });
 
 export const toolError = (error: unknown) => {
-    let text: string;
-    if (error instanceof Error && 'code' in error) {
-        text = `[${(error as Error & { code: string }).code}] ${error.message}`;
-    } else if (error instanceof Error) {
-        text = error.message;
-    } else {
-        text = String(error);
-    }
-    return { isError: true as const, content: [{ type: 'text' as const, text }] };
+    const code = error instanceof Error && 'code' in error ? (error as Error & { code: string }).code : undefined;
+    const message = error instanceof Error ? error.message : String(error);
+    const text = code ? `[${code}] ${message}` : message;
+    return {
+        isError: true as const,
+        content: [{ type: 'text' as const, text }],
+        structuredContent: { error: message, ...(code && { code }) },
+    };
 };
 
 /** Extract portable node fields, stripping runtime state */
@@ -45,4 +47,9 @@ export const makeProgressHandler = (extra: {
             })
             .catch(() => {});
     };
+};
+
+/** Send a log message to the MCP client */
+export const mcpLog = (server: McpServer, level: 'info' | 'warning' | 'error' | 'debug', data: string) => {
+    server.sendLoggingMessage({ level, data, logger: 'flow-mcp' }).catch(() => {});
 };

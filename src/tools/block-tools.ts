@@ -1,10 +1,14 @@
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { FlowApiClient } from '../api-client';
-import { toolError, toolJson } from './helpers';
+import { toolError, toolResult } from './helpers';
+import { completableBlockType, completableStereo } from './completions';
+import { PassthroughSchema, BlockListOutputSchema } from './schemas';
 import type { BlockView } from '../types';
 
 export const registerBlockTools = (server: McpServer, client: FlowApiClient) => {
+    const blockType = completableBlockType(client);
+
     server.registerTool(
         'block_get',
         {
@@ -13,14 +17,15 @@ export const registerBlockTools = (server: McpServer, client: FlowApiClient) => 
                 'Get block definition by ID or name (e.g. "input-text", "text-transform"). ' +
                 'Returns full port specs and config schema. Use block_list first to discover available blocks.',
             inputSchema: z.object({
-                blockId: z.string().describe('Block ID (numeric) or name (e.g. "input-text", "text-transform")'),
+                blockId: blockType,
             }),
+            outputSchema: PassthroughSchema,
             annotations: { readOnlyHint: true },
         },
         async ({ blockId }) => {
             try {
                 const result = await client.getBlock(blockId);
-                return toolJson(summarizeBlock(result));
+                return toolResult(summarizeBlock(result));
             } catch (e) {
                 return toolError(e);
             }
@@ -35,8 +40,9 @@ export const registerBlockTools = (server: McpServer, client: FlowApiClient) => 
                 'List all available block definitions with ports and config schema. ' +
                 'Call this BEFORE creating flows to know what block types exist, their inputs/outputs, and configuration options.',
             inputSchema: z.object({
-                stereo: z.optional(z.enum(['input', 'process', 'output'])).describe('Filter by block category'),
+                stereo: z.optional(completableStereo),
             }),
+            outputSchema: BlockListOutputSchema,
             annotations: { readOnlyHint: true },
         },
         async ({ stereo }) => {
@@ -49,7 +55,7 @@ export const registerBlockTools = (server: McpServer, client: FlowApiClient) => 
                 }
 
                 const summary = blocks.map(summarizeBlock);
-                return toolJson({ total: summary.length, blocks: summary });
+                return toolResult({ total: summary.length, blocks: summary });
             } catch (e) {
                 return toolError(e);
             }

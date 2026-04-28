@@ -3,9 +3,14 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { FlowApiClient } from '../api-client';
 import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured } from '../ws-client';
-import { filterDefined, makeProgressHandler, toolError, toolJson } from './helpers';
+import { filterDefined, makeProgressHandler, mcpLog, toolError, toolResult } from './helpers';
+import { completableFlowId, completableBlockType } from './completions';
+import { PassthroughSchema, NodeRunOutputSchema } from './schemas';
 
 export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiConfig: FlowApiConfig) => {
+    const flowId = completableFlowId(client);
+    const blockType = completableBlockType(client);
+
     server.registerTool(
         'node_get',
         {
@@ -16,12 +21,13 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
             inputSchema: z.object({
                 nodeId: z.string().describe('Node ID'),
             }),
+            outputSchema: PassthroughSchema,
             annotations: { readOnlyHint: true },
         },
         async ({ nodeId }) => {
             try {
                 const result = await client.getNode(nodeId);
-                return toolJson(result);
+                return toolResult(result);
             } catch (e) {
                 return toolError(e);
             }
@@ -36,8 +42,8 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 'Add a new node to an existing flow. Use block_list to get blockId and default config. ' +
                 'Returns the created node with server-assigned ID. Use edge_create after to connect it.',
             inputSchema: z.object({
-                flowId: z.string().describe('Flow ID to add the node to'),
-                blockId: z.string().describe('Block ID (e.g., "input-text", "buffer"). Get from block_list.'),
+                flowId,
+                blockId: blockType,
                 position: z
                     .optional(z.object({ x: z.number(), y: z.number() }))
                     .describe('Canvas position (default: {x:400, y:300})'),
@@ -46,6 +52,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     .describe('Initial config. Keys from block configSchema.'),
                 customLabel: z.optional(z.string()).describe('Display label'),
             }),
+            outputSchema: PassthroughSchema,
         },
         async ({ flowId, blockId, position, config: nodeConfig, customLabel }) => {
             try {
@@ -56,7 +63,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     customLabel,
                     autoExecutionEnabled: true,
                 });
-                return toolJson(result);
+                return toolResult(result);
             } catch (e) {
                 return toolError(e);
             }
@@ -72,19 +79,22 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 'Monitors via WebSocket until complete. Use node_get_port after to inspect output data.',
             inputSchema: z.object({
                 nodeId: z.string().describe('Node ID to execute'),
-                flowId: z.string().describe('Flow ID containing this node. Get from flow_load.'),
+                flowId,
                 propagate: z.optional(z.boolean()).describe('Propagate execution to downstream nodes (default: false)'),
                 config: z.optional(z.record(z.string(), z.string())).describe('Config overrides for this execution'),
                 timeout: z.optional(z.number()).describe('Max wait time in ms (default: 30000)'),
             }),
+            outputSchema: NodeRunOutputSchema,
         },
         async ({ nodeId, flowId, propagate, config: runConfig, timeout }, extra) => {
             try {
+                mcpLog(server, 'info', `Starting node execution: ${nodeId} in flow ${flowId}`);
+
                 const opts = { propagate: propagate ?? false, config: runConfig };
 
                 if (!isWsConfigured(apiConfig)) {
                     const result = await client.runNode(nodeId, opts);
-                    return toolJson(result);
+                    return toolResult(result);
                 }
 
                 const startTime = Date.now();
@@ -99,12 +109,19 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 });
 
                 const status = nodeStates.get(nodeId) ?? 'UNKNOWN';
+                const duration = Date.now() - startTime;
+
+                mcpLog(
+                    server,
+                    timedOut ? 'warning' : 'info',
+                    `Node ${nodeId} ${timedOut ? 'timed out' : status} in ${duration}ms`,
+                );
 
                 const result: Record<string, unknown> = {
                     nodeId,
                     flowId,
                     status,
-                    duration: Date.now() - startTime,
+                    duration,
                     eventLog,
                 };
 
@@ -114,7 +131,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     if (node?.error || node?.errorMessage) result.error = node.errorMessage ?? node.error;
                     if (timedOut) result.message = `Timed out after ${timeout ?? 30_000}ms. Node status: ${status}`;
                 }
-                return toolJson(result);
+                return toolResult(result);
             } catch (e) {
                 return toolError(e);
             }
@@ -133,12 +150,13 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 portId: z.string().describe('Port ID (e.g., "out", "in")'),
                 direction: z.enum(['in', 'out']).describe('Port direction'),
             }),
+            outputSchema: PassthroughSchema,
             annotations: { readOnlyHint: true },
         },
         async ({ nodeId, portId, direction }) => {
             try {
                 const result = await client.getPortData(nodeId, portId, direction);
-                return toolJson(result);
+                return toolResult(result);
             } catch (e) {
                 return toolError(e);
             }
@@ -154,7 +172,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 'Use flow_load first to get current node data.',
             inputSchema: z.object({
                 nodeId: z.string().describe('Node ID to update'),
-                flowId: z.string().describe('Flow ID containing this node'),
+                flowId,
                 customLabel: z.optional(z.string()).describe('Display label (rename the node)'),
                 description: z.optional(z.string()).describe('Node description'),
                 config: z.optional(z.record(z.string(), z.string())).describe('Config key-value pairs to update'),
@@ -165,6 +183,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 errorMessage: z.optional(z.string()).describe('Set error message'),
                 autoExecutionEnabled: z.optional(z.boolean()).describe('Enable/disable auto execution'),
             }),
+            outputSchema: PassthroughSchema,
         },
         async ({
             nodeId,
@@ -192,7 +211,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     autoExecutionEnabled,
                 });
                 const result = await client.upsertNode(nodeId, flowId, body);
-                return toolJson(result);
+                return toolResult(result);
             } catch (e) {
                 return toolError(e);
             }
@@ -205,9 +224,10 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
             title: 'Delete Node',
             description: 'Delete one or more nodes from a flow.',
             inputSchema: z.object({
-                flowId: z.string().describe('Flow ID containing the nodes'),
+                flowId,
                 nodeIds: z.array(z.string()).describe('Node IDs to delete'),
             }),
+            outputSchema: PassthroughSchema,
             annotations: { destructiveHint: true },
         },
         async ({ flowId, nodeIds }) => {
@@ -216,7 +236,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     nodes: nodeIds.map(id => ({ id: `#${id}` })),
                     edges: [],
                 });
-                return toolJson({ deleted: nodeIds, flowId });
+                return toolResult({ deleted: nodeIds, flowId });
             } catch (e) {
                 return toolError(e);
             }
@@ -229,12 +249,13 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
             title: 'Create Edge',
             description: 'Connect two nodes by creating an edge. Use flow_load to get node IDs and port names.',
             inputSchema: z.object({
-                flowId: z.string().describe('Flow ID'),
+                flowId,
                 sourceNodeId: z.string().describe('Source node ID'),
                 sourcePortId: z.string().describe('Source port ID (e.g., "out")'),
                 targetNodeId: z.string().describe('Target node ID'),
                 targetPortId: z.string().describe('Target port ID (e.g., "in")'),
             }),
+            outputSchema: PassthroughSchema,
         },
         async ({ flowId, sourceNodeId, sourcePortId, targetNodeId, targetPortId }) => {
             try {
@@ -242,7 +263,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     nodes: [],
                     edges: [{ id: '', sourceNodeId, sourcePortId, targetNodeId, targetPortId }],
                 });
-                return toolJson(result);
+                return toolResult(result);
             } catch (e) {
                 return toolError(e);
             }
@@ -255,9 +276,10 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
             title: 'Delete Edge',
             description: 'Delete one or more edges from a flow. Get edge IDs from flow_load.',
             inputSchema: z.object({
-                flowId: z.string().describe('Flow ID'),
+                flowId,
                 edgeIds: z.array(z.string()).describe('Edge IDs to delete'),
             }),
+            outputSchema: PassthroughSchema,
             annotations: { destructiveHint: true },
         },
         async ({ flowId, edgeIds }) => {
@@ -266,7 +288,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     nodes: [],
                     edges: edgeIds.map(id => ({ id: `#${id}` })),
                 });
-                return toolJson({ deleted: edgeIds, flowId });
+                return toolResult({ deleted: edgeIds, flowId });
             } catch (e) {
                 return toolError(e);
             }

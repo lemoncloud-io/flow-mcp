@@ -1,30 +1,31 @@
 import { describe, it, expect } from 'vitest';
-import { toolJson, toolError } from '../../src/tools/helpers';
+import { toolResult, toolError } from '../../src/tools/helpers';
 
-describe('toolJson', () => {
-  it('should wrap object as pretty-printed JSON text content', () => {
-    const result = toolJson({ id: '1', name: 'test' });
+describe('toolResult', () => {
+  it('should return both content and structuredContent', () => {
+    const data = { id: '1', name: 'test' };
+    const result = toolResult(data);
 
-    expect(result).toEqual({
-      content: [{ type: 'text', text: JSON.stringify({ id: '1', name: 'test' }, null, 2) }],
-    });
+    expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(data, null, 2) }]);
+    expect(result.structuredContent).toEqual(data);
   });
 
-  it('should handle null', () => {
-    const result = toolJson(null);
+  it('should return the same object reference in structuredContent', () => {
+    const data = { flowId: 'f-1', status: 'completed' };
+    const result = toolResult(data);
 
-    expect(result.content[0].text).toBe('null');
+    expect(result.structuredContent).toBe(data);
   });
 
   it('should handle nested objects', () => {
     const data = { a: { b: [1, 2, 3] } };
-    const result = toolJson(data);
+    const result = toolResult(data);
 
     expect(JSON.parse(result.content[0].text)).toEqual(data);
   });
 
   it('should handle empty object', () => {
-    const result = toolJson({});
+    const result = toolResult({});
 
     expect(result.content[0].text).toBe('{}');
   });
@@ -34,10 +35,17 @@ describe('toolError', () => {
   it('should extract message from Error instance', () => {
     const result = toolError(new Error('something failed'));
 
-    expect(result).toEqual({
-      isError: true,
-      content: [{ type: 'text', text: 'something failed' }],
-    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe('something failed');
+    expect(result.structuredContent).toEqual({ error: 'something failed' });
+  });
+
+  it('should include error code when present', () => {
+    const err = Object.assign(new Error('not found'), { code: 'not_found' });
+    const result = toolError(err);
+
+    expect(result.content[0].text).toBe('[not_found] not found');
+    expect(result.structuredContent).toEqual({ error: 'not found', code: 'not_found' });
   });
 
   it('should convert string via String()', () => {
@@ -45,6 +53,7 @@ describe('toolError', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toBe('raw string error');
+    expect(result.structuredContent).toEqual({ error: 'raw string error' });
   });
 
   it('should convert number via String()', () => {
@@ -52,6 +61,7 @@ describe('toolError', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toBe('42');
+    expect(result.structuredContent).toEqual({ error: '42' });
   });
 
   it('should always set isError to true', () => {
