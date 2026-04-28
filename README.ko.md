@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/eurekaflow%20logo.png" alt="Eureka Flow" height="60" />
+  <img src="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/logo.png" alt="Eureka Flow" height="60" />
 </p>
 
 <h1 align="center">flow-mcp</h1>
@@ -93,7 +93,7 @@ npm install -g @lemoncloud/flow-mcp
 | `FLOW_API_KEY` | O | — | API 인증 키 |
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API 서버 주소 |
 | `FLOW_API_TIMEOUT` | | `30000` | API 요청 타임아웃 (ms) |
-| `FLOW_WS_URL` | | — | WebSocket 주소. 설정하면 실행 중 실시간 진행상황을 볼 수 있습니다. |
+| `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket 주소 (실시간 진행상황 모니터링) |
 
 ## 사용 예시
 

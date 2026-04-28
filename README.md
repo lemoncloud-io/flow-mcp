@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/eurekaflow%20logo.png" alt="Eureka Flow" height="60" />
+  <img src="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/logo.png" alt="Eureka Flow" height="60" />
 </p>
 
 <h1 align="center">flow-mcp</h1>
@@ -93,9 +93,7 @@ Restart your client and say **"Show my flows"**.
 | `FLOW_API_KEY` | Yes | — | API authentication key |
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API server URL |
 | `FLOW_API_TIMEOUT` | | `30000` | Request timeout (ms) |
-| `FLOW_WS_URL` | | — | WebSocket URL for real-time execution monitoring |
-
-> **Tip:** Set `FLOW_WS_URL` to enable live progress tracking during `flow_run` and `node_run`.
+| `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket URL for real-time execution monitoring |
 
 ## Examples
 

@@ -22,7 +22,7 @@ const captureHandlers = (mockClient: MockApiClient) => {
     }),
   } as unknown as McpServer;
 
-  registerFlowTools(mockServer, mockClient as never, makeConfig());
+  registerFlowTools(mockServer, mockClient as never, makeConfig({ FLOW_WS_URL: '' }));
   return handlers;
 };
 

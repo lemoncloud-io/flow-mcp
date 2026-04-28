@@ -83,7 +83,15 @@ describe('getConfig', () => {
     expect(first).toBe(second); // same reference
   });
 
-  it('should include FLOW_WS_URL when provided', async () => {
+  it('should have FLOW_WS_URL with a default value', async () => {
+    vi.stubEnv('FLOW_API_URL', VALID_ENV.FLOW_API_URL);
+    vi.stubEnv('FLOW_API_KEY', VALID_ENV.FLOW_API_KEY);
+    const { getConfig } = await loadConfig();
+
+    expect(getConfig()!.FLOW_WS_URL).toBe('wss://wss.eureka.codes/wss-v1');
+  });
+
+  it('should use custom FLOW_WS_URL when provided', async () => {
     vi.stubEnv('FLOW_API_URL', VALID_ENV.FLOW_API_URL);
     vi.stubEnv('FLOW_API_KEY', VALID_ENV.FLOW_API_KEY);
     vi.stubEnv('FLOW_WS_URL', 'wss://ws.example.com');
