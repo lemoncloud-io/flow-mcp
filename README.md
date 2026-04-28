@@ -136,7 +136,7 @@ Restart your client and say **"Show my flows"**.
 → Port data (value, type, timestamp)
 ```
 
-## 16 Tools
+## 23 Tools
 
 Claude automatically selects the right tool based on your request.
 
@@ -144,14 +144,18 @@ Claude automatically selects the right tool based on your request.
 |------|-------------|
 | `profile_get` | Check API key configuration status |
 | `block_list` | List available block types |
-| `flow_list` | List your workflows |
+| `block_get` | Get block details by ID or name |
+| `flow_list` | List your workflows (with pagination) |
 | `flow_load` | Load full flow state (nodes, edges, ports) |
 | `flow_graph` | Mermaid diagram visualization |
 | `flow_create` | Create new flow (nodes + edges at once) |
 | `flow_update` | Update flow name / description |
 | `flow_save` | Full rebuild (caution: reassigns node IDs) |
+| `flow_clone` | Duplicate a flow |
+| `flow_export` | Export flow as portable JSON |
 | `flow_run` | Execute flow + real-time monitoring |
-| `flow_delete` | Delete a flow |
+| `flow_run_from` | Run flow from a specific node |
+| `node_get` | Get single node details |
 | `node_create` | Add node to existing flow |
 | `node_run` | Execute single node |
 | `node_get_port` | Inspect node input/output data |
@@ -159,6 +163,8 @@ Claude automatically selects the right tool based on your request.
 | `node_delete` | Delete a node |
 | `edge_create` | Connect two nodes |
 | `edge_delete` | Remove a connection |
+| `run_list` | List execution history with token usage |
+| `run_get` | Get execution run details |
 
 ---
 
@@ -207,7 +213,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 16 tools)
+  -> server.ts (McpServer + 23 tools)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)
