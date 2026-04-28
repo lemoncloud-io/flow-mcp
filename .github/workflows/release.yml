@@ -84,7 +84,7 @@ jobs:
             unfurl_media: false
             attachments: [
                 {
-                    "color": "#CB3837",
+                    "color": "#36a64f",
                     "blocks": [
                         {
                             "type": "section",
