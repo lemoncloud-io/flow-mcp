@@ -41,7 +41,12 @@ jobs:
 
       - name: Semantic Release
         id: release
-        run: npx semantic-release
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -118,7 +123,7 @@ jobs:
             ]
 
       - name: Notify Slack on failure
-        if: failure()
+        if: failure() && steps.release.outcome == 'failure'
         continue-on-error: true
         uses: slackapi/slack-github-action@v2.1.1
         with:
