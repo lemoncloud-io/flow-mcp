@@ -11,6 +11,7 @@ const captureHandlers = (mockClient: MockApiClient) => {
     registerTool: vi.fn((name: string, _meta: unknown, handler: ToolHandler) => {
       handlers[name] = handler;
     }),
+    sendLoggingMessage: vi.fn().mockResolvedValue(undefined),
   } as unknown as McpServer;
 
   registerNodeTools(mockServer, mockClient as never, makeConfig({ FLOW_WS_URL: '' }));

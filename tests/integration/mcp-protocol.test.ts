@@ -10,7 +10,7 @@ import type { FlowApiClient } from '../../src/api-client';
 const createTestServer = (mockClient: Record<string, ReturnType<typeof vi.fn>>) => {
   const server = new McpServer(
     { name: 'flow-mcp-test', version: '0.0.1' },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {}, logging: {} } },
   );
   const config = makeConfig();
 
@@ -29,11 +29,14 @@ describe('MCP Protocol Integration', () => {
 
   beforeEach(async () => {
     mockApi = {
+      getProfile: vi.fn().mockResolvedValue({ sid: 's1', uid: 'u1', geminiApiKey: 'k', openaiApiKey: 'k' }),
       listFlows: vi.fn().mockResolvedValue(makeListResult([makeFlow()])),
       loadFlow: vi.fn().mockResolvedValue(makeSaveFlow()),
       saveFlow: vi.fn().mockResolvedValue(makeSaveFlow()),
+      upsertFlow: vi.fn().mockResolvedValue({ id: 'flow-1' }),
       runFlow: vi.fn().mockResolvedValue(makeFlow({ status: 'completed' })),
       runNode: vi.fn().mockResolvedValue(makeNodeView({ status: 'COMPLETED' })),
+      upsertNode: vi.fn().mockResolvedValue(makeNodeView()),
       getPortData: vi.fn().mockResolvedValue(makePortData()),
       listBlocks: vi.fn().mockResolvedValue(makeListResult([makeBlock()])),
       getNode: vi.fn().mockResolvedValue({ id: 'node-1', type: 'input-text', position: { x: 100, y: 200 } }),
@@ -87,14 +90,39 @@ describe('MCP Protocol Integration', () => {
     ]);
   });
 
-  it('should invoke flow_list and return valid JSON', async () => {
-    const response = await client.callTool({ name: 'flow_list', arguments: {} });
-    const text = (response.content as Array<{ type: string; text: string }>)[0].text;
-    const data = JSON.parse(text);
+  it('should have outputSchema on all tools', async () => {
+    const { tools } = await client.listTools();
 
+    for (const tool of tools) {
+      expect(tool.outputSchema, `${tool.name} missing outputSchema`).toBeDefined();
+    }
+  });
+
+  it('should return structuredContent from flow_list', async () => {
+    const response = await client.callTool({ name: 'flow_list', arguments: {} });
+
+    expect(response.structuredContent).toBeDefined();
+    const data = response.structuredContent as Record<string, unknown>;
     expect(data.total).toBe(1);
-    expect(data.flows).toHaveLength(1);
-    expect(data.flows[0].id).toBe('flow-1');
+    expect((data.flows as Array<Record<string, unknown>>)[0].id).toBe('flow-1');
+  });
+
+  it('should return structuredContent from profile_get', async () => {
+    const response = await client.callTool({ name: 'profile_get', arguments: {} });
+
+    expect(response.structuredContent).toBeDefined();
+    const data = response.structuredContent as Record<string, unknown>;
+    expect(data.sid).toBe('s1');
+    expect(data.hasGeminiApiKey).toBe(true);
+  });
+
+  it('should return structuredContent from flow_graph', async () => {
+    const response = await client.callTool({ name: 'flow_graph', arguments: { flowId: 'flow-1' } });
+
+    expect(response.structuredContent).toBeDefined();
+    const data = response.structuredContent as Record<string, unknown>;
+    expect(data.flowId).toBe('flow-1');
+    expect(data.mermaid).toContain('graph LR');
   });
 
   it('should invoke block_list with stereo filter', async () => {
@@ -106,29 +134,30 @@ describe('MCP Protocol Integration', () => {
     );
 
     const response = await client.callTool({ name: 'block_list', arguments: { stereo: 'input' } });
-    const data = JSON.parse((response.content as Array<{ type: string; text: string }>)[0].text);
 
+    expect(response.structuredContent).toBeDefined();
+    const data = response.structuredContent as Record<string, unknown>;
     expect(data.total).toBe(1);
-    expect(data.blocks[0].id).toBe('b1');
   });
 
-  it('should return isError on API failure', async () => {
+  it('should return structured error on API failure', async () => {
     mockApi.listFlows.mockRejectedValue(new Error('Service unavailable'));
 
     const response = await client.callTool({ name: 'flow_list', arguments: {} });
 
     expect(response.isError).toBe(true);
-    expect((response.content as Array<{ text: string }>)[0].text).toContain('Service unavailable');
+    expect(response.structuredContent).toBeDefined();
+    const data = response.structuredContent as Record<string, unknown>;
+    expect(data.error).toBe('Service unavailable');
   });
 
-  it('should invoke node_get_port successfully', async () => {
+  it('should invoke node_get_port and return structuredContent', async () => {
     const response = await client.callTool({
       name: 'node_get_port',
       arguments: { nodeId: 'n-1', portId: 'out', direction: 'out' },
     });
-    const data = JSON.parse((response.content as Array<{ type: string; text: string }>)[0].text);
 
-    expect(data.data.type).toBe('text');
+    expect(response.structuredContent).toBeDefined();
     expect(mockApi.getPortData).toHaveBeenCalledWith('n-1', 'out', 'out');
   });
 });

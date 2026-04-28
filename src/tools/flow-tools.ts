@@ -5,7 +5,16 @@ import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured } from '../ws-client';
 import { TERMINAL_STATES } from '../types';
 import type { EdgeData } from '../types';
-import { filterDefined, makeProgressHandler, stripNodeRuntime, toolError, toolJson } from './helpers';
+import { filterDefined, makeProgressHandler, mcpLog, stripNodeRuntime, toolError, toolResult } from './helpers';
+import { completableFlowId } from './completions';
+import {
+    PassthroughSchema,
+    ProfileOutputSchema,
+    FlowListOutputSchema,
+    FlowGraphOutputSchema,
+    FlowExportOutputSchema,
+    FlowRunOutputSchema,
+} from './schemas';
 
 const NodeDataSchema = z.object({
     type: z.string().describe('Block process type (e.g., "input-text", "text-transform"). Get from block_list.'),
@@ -68,7 +77,7 @@ const buildRunResult = async (opts: RunResultOpts) => {
     }
 
     const status = timedOut ? 'timeout' : hasError ? 'error' : 'completed';
-    return toolJson({
+    return toolResult({
         flowId,
         ...(startNodeId && { startNodeId }),
         status,
@@ -82,6 +91,8 @@ const buildRunResult = async (opts: RunResultOpts) => {
 };
 
 export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiConfig: FlowApiConfig) => {
+    const flowId = completableFlowId(client);
+
     server.registerTool(
         'profile_get',
         {
@@ -91,12 +102,13 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 'Returns whether geminiApiKey and openaiApiKey are configured. ' +
                 'These keys are required for flow execution — if missing, flows cannot run.',
             inputSchema: z.object({}),
+            outputSchema: ProfileOutputSchema,
             annotations: { readOnlyHint: true },
         },
         async () => {
             try {
                 const profile = await client.getProfile();
-                return toolJson({
+                return toolResult({
                     sid: profile.sid,
                     uid: profile.uid,
                     hasGeminiApiKey: !!profile.geminiApiKey,
@@ -119,6 +131,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 offset: z.optional(z.number().int().min(0)).describe('Pagination offset'),
                 sort: z.optional(z.enum(['asc', 'desc'])).describe('Sort by modified date'),
             }),
+            outputSchema: FlowListOutputSchema,
             annotations: { readOnlyHint: true },
         },
         async ({ isPublic, limit, offset, sort }) => {
@@ -132,7 +145,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     isPublic: f.isPublic,
                     modifiedAt: f.modifiedAt,
                 }));
-                return toolJson({ total: result.total, limit: result.limit, offset: result.offset, flows: summary });
+                return toolResult({ total: result.total, limit: result.limit, offset: result.offset, flows: summary });
             } catch (e) {
                 return toolError(e);
             }
@@ -145,15 +158,14 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
             title: 'Load Flow',
             description:
                 "Load flow with full canvas state (nodes, edges, ports). Use to inspect a flow's structure before modifying.",
-            inputSchema: z.object({
-                flowId: z.string().describe('Flow ID to load'),
-            }),
+            inputSchema: z.object({ flowId }),
+            outputSchema: PassthroughSchema,
             annotations: { readOnlyHint: true },
         },
         async ({ flowId }) => {
             try {
                 const flow = await client.loadFlow(flowId);
-                return toolJson(flow);
+                return toolResult(flow);
             } catch (e) {
                 return toolError(e);
             }
@@ -167,9 +179,8 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
             description:
                 'Visualize flow as a Mermaid diagram with node statuses, data values, and execution stats. ' +
                 'Shows the complete graph structure at a glance.',
-            inputSchema: z.object({
-                flowId: z.string().describe('Flow ID to visualize'),
-            }),
+            inputSchema: z.object({ flowId }),
+            outputSchema: FlowGraphOutputSchema,
             annotations: { readOnlyHint: true },
         },
         async ({ flowId }) => {
@@ -219,7 +230,10 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     .filter(Boolean)
                     .join('\n');
 
-                return { content: [{ type: 'text' as const, text: summary }] };
+                return {
+                    content: [{ type: 'text' as const, text: summary }],
+                    structuredContent: { flowId, mermaid },
+                };
             } catch (e) {
                 return toolError(e);
             }
@@ -244,6 +258,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                         'Connections between nodes. Use array index as node ID (e.g., "0" for first node) — resolved to real IDs internally.',
                     ),
             }),
+            outputSchema: PassthroughSchema,
         },
         async ({ name, description, nodes, edges }) => {
             try {
@@ -255,7 +270,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 });
 
                 if (!edges?.length || !created.nodes?.length) {
-                    return toolJson(created);
+                    return toolResult(created);
                 }
 
                 const realNodes = created.nodes;
@@ -273,7 +288,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     edges: resolvedEdges,
                 });
 
-                return toolJson(saved);
+                return toolResult(saved);
             } catch (e) {
                 return toolError(e);
             }
@@ -287,15 +302,16 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
             description:
                 'Update flow metadata (name, description) without touching nodes or edges. Safe to use anytime.',
             inputSchema: z.object({
-                flowId: z.string().describe('Flow ID'),
+                flowId,
                 name: z.optional(z.string()).describe('New flow name'),
                 description: z.optional(z.string()).describe('New flow description'),
             }),
+            outputSchema: PassthroughSchema,
         },
         async ({ flowId, name, description }) => {
             try {
                 const result = await client.upsertFlow(flowId, filterDefined({ name, description }));
-                return toolJson(result);
+                return toolResult(result);
             } catch (e) {
                 return toolError(e);
             }
@@ -311,18 +327,19 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 'Only use for complete flow rebuilds. For modifications, use node_update (change properties), ' +
                 'node_delete (remove nodes), or flow_create (new flow) instead.',
             inputSchema: z.object({
-                flowId: z.string().describe('Flow ID. Use flow_load first to get current state.'),
+                flowId,
                 name: z.optional(z.string()),
                 description: z.optional(z.string()),
                 nodes: z.array(NodeDataSchema).describe('Full node list (replaces ALL existing nodes)'),
                 edges: z.array(EdgeDataSchema).describe('Full edge list (replaces ALL existing edges)'),
             }),
+            outputSchema: PassthroughSchema,
             annotations: { destructiveHint: true, idempotentHint: true },
         },
         async ({ flowId, name, description, nodes, edges }) => {
             try {
                 const result = await client.saveFlow(flowId, { name, description, nodes, edges });
-                return toolJson(result);
+                return toolResult(result);
             } catch (e) {
                 return toolError(e);
             }
@@ -337,9 +354,10 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 'Clone an existing flow into a new flow. Copies all nodes, edges, and config. ' +
                 'Use to duplicate a flow as a starting point for modifications.',
             inputSchema: z.object({
-                flowId: z.string().describe('Flow ID to clone'),
+                flowId,
                 name: z.optional(z.string()).describe('Name for the cloned flow (default: original name + " (Copy)")'),
             }),
+            outputSchema: PassthroughSchema,
         },
         async ({ flowId, name }) => {
             try {
@@ -356,7 +374,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 const sourceEdges = source.edges ?? [];
                 if (!sourceEdges.length || !created.nodes?.length) {
-                    return toolJson(created);
+                    return toolResult(created);
                 }
 
                 const indexEdges = remapEdgesToIndices(sourceEdges, source.nodes ?? []);
@@ -373,7 +391,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     nodes: created.nodes!,
                     edges: resolvedEdges,
                 });
-                return toolJson(saved);
+                return toolResult(saved);
             } catch (e) {
                 return toolError(e);
             }
@@ -387,15 +405,14 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
             description:
                 'Export flow as clean JSON that can be used with flow_create to recreate it. ' +
                 'Strips runtime fields (status, errors). Use for backup, sharing, or git storage.',
-            inputSchema: z.object({
-                flowId: z.string().describe('Flow ID to export'),
-            }),
+            inputSchema: z.object({ flowId }),
+            outputSchema: FlowExportOutputSchema,
             annotations: { readOnlyHint: true },
         },
         async ({ flowId }) => {
             try {
                 const flow = await client.loadFlow(flowId);
-                return toolJson({
+                return toolResult({
                     name: flow.name,
                     description: flow.description,
                     nodes: stripNodeRuntime(flow.nodes ?? []),
@@ -415,13 +432,16 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 'Execute a flow starting from a specific node with downstream propagation. ' +
                 'Useful for retrying from a failed node without re-running the entire flow.',
             inputSchema: z.object({
-                flowId: z.string().describe('Flow ID'),
+                flowId,
                 startNodeId: z.string().describe('Node ID to start execution from'),
                 timeout: z.optional(z.number()).describe('Max wait time in ms (default: 60000)'),
             }),
+            outputSchema: FlowRunOutputSchema,
         },
         async ({ flowId, startNodeId, timeout }, extra) => {
             try {
+                mcpLog(server, 'info', `Starting flow execution from node ${startNodeId}: ${flowId}`);
+
                 const flow = await client.loadFlow(flowId);
                 const edges = flow.edges ?? [];
                 const allNodeIds = (flow.nodes ?? []).filter(n => !n.disabled && n.id).map(n => n.id!);
@@ -430,7 +450,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 if (!isWsConfigured(apiConfig)) {
                     const result = await client.runNode(startNodeId, { propagate: true });
-                    return toolJson(result);
+                    return toolResult(result);
                 }
 
                 const startTime = Date.now();
@@ -447,6 +467,13 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                         });
                     },
                 });
+
+                const duration = Date.now() - startTime;
+                mcpLog(
+                    server,
+                    timedOut ? 'warning' : 'info',
+                    `Flow ${flowId} ${timedOut ? 'timed out' : 'completed'} in ${duration}ms`,
+                );
 
                 return buildRunResult({
                     client,
@@ -473,18 +500,21 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 'Execute entire flow. Triggers async execution and monitors via WebSocket until all nodes complete. ' +
                 'Falls back to sync execution if WebSocket is not configured. Use flow_load after for full details.',
             inputSchema: z.object({
-                flowId: z.string().describe('Flow ID to execute'),
+                flowId,
                 config: z.optional(z.record(z.string(), z.string())).describe('Config overrides for the run'),
                 timeout: z.optional(z.number()).describe('Max wait time in ms (default: 60000)'),
             }),
+            outputSchema: FlowRunOutputSchema,
         },
         async ({ flowId, config: runConfig, timeout }, extra) => {
             try {
+                mcpLog(server, 'info', `Starting flow execution: ${flowId}`);
+
                 const body = runConfig ? { config: runConfig } : undefined;
 
                 if (!isWsConfigured(apiConfig)) {
                     const result = await client.runFlow(flowId, body);
-                    return toolJson(result);
+                    return toolResult(result);
                 }
 
                 const startTime = Date.now();
@@ -504,6 +534,13 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                         await Promise.all(startNodeIds.map(nodeId => client.runNode(nodeId, runOpts)));
                     },
                 });
+
+                const duration = Date.now() - startTime;
+                mcpLog(
+                    server,
+                    timedOut ? 'warning' : 'info',
+                    `Flow ${flowId} ${timedOut ? 'timed out' : 'completed'} in ${duration}ms`,
+                );
 
                 return buildRunResult({
                     client,

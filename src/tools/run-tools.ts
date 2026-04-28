@@ -2,9 +2,10 @@ import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { FlowApiClient } from '../api-client';
 import type { RunView } from '../types';
-import { toolError, toolJson } from './helpers';
+import { toolError, toolResult } from './helpers';
+import { PassthroughSchema, RunListOutputSchema } from './schemas';
 
-const summarizeRun = (r: RunView) => ({
+const summarizeRun = (r: RunView): Record<string, unknown> => ({
     id: r.id,
     flowId: r.flowId,
     nodeId: r.nodeId,
@@ -28,13 +29,14 @@ export const registerRunTools = (server: McpServer, client: FlowApiClient) => {
                 limit: z.optional(z.number().int().min(1).max(100)).describe('Max results (default: 10)'),
                 offset: z.optional(z.number().int().min(0)).describe('Pagination offset'),
             }),
+            outputSchema: RunListOutputSchema,
             annotations: { readOnlyHint: true },
         },
         async ({ limit, offset }) => {
             try {
                 const result = await client.listRuns({ limit, offset });
                 const runs = result.list.map(summarizeRun);
-                return toolJson({ total: result.total, limit: result.limit, offset: result.offset, runs });
+                return toolResult({ total: result.total, limit: result.limit, offset: result.offset, runs });
             } catch (e) {
                 return toolError(e);
             }
@@ -51,12 +53,13 @@ export const registerRunTools = (server: McpServer, client: FlowApiClient) => {
             inputSchema: z.object({
                 runId: z.string().describe('Run ID'),
             }),
+            outputSchema: PassthroughSchema,
             annotations: { readOnlyHint: true },
         },
         async ({ runId }) => {
             try {
                 const result = await client.getRun(runId);
-                return toolJson(result);
+                return toolResult(result);
             } catch (e) {
                 return toolError(e);
             }
