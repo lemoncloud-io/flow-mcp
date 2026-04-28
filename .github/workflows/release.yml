@@ -79,7 +79,7 @@ jobs:
           token: ${{ secrets.RELEASE_BOT_TOKEN }}
           payload: |
             channel: ${{ secrets.EUREKACODES_CHANNEL }}
-            text: ":npm: flow-mcp npm publish 알림"
+            text: ":npm: Publish 알림"
             unfurl_links: false
             unfurl_media: false
             attachments: [
