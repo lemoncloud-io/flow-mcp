@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { registerFlowTools, registerNodeTools, registerBlockTools } from '../../src/tools';
-import { makeConfig, makeFlow, makeBlock, makePortData, makeListResult, makeSaveFlow, makeNodeView } from '../helpers/factories';
+import { registerFlowTools, registerNodeTools, registerBlockTools, registerRunTools } from '../../src/tools';
+import { makeConfig, makeFlow, makeBlock, makePortData, makeListResult, makeSaveFlow, makeNodeView, makeRun } from '../helpers/factories';
 import type { FlowApiClient } from '../../src/api-client';
 
 // Create a real McpServer with mock API client
@@ -17,6 +17,7 @@ const createTestServer = (mockClient: Record<string, ReturnType<typeof vi.fn>>) 
   registerFlowTools(server, mockClient as unknown as FlowApiClient, config);
   registerNodeTools(server, mockClient as unknown as FlowApiClient, config);
   registerBlockTools(server, mockClient as unknown as FlowApiClient);
+  registerRunTools(server, mockClient as unknown as FlowApiClient);
 
   return server;
 };
@@ -35,6 +36,10 @@ describe('MCP Protocol Integration', () => {
       runNode: vi.fn().mockResolvedValue(makeNodeView({ status: 'COMPLETED' })),
       getPortData: vi.fn().mockResolvedValue(makePortData()),
       listBlocks: vi.fn().mockResolvedValue(makeListResult([makeBlock()])),
+      getNode: vi.fn().mockResolvedValue({ id: 'node-1', type: 'input-text', position: { x: 100, y: 200 } }),
+      getBlock: vi.fn().mockResolvedValue(makeBlock()),
+      listRuns: vi.fn().mockResolvedValue(makeListResult([makeRun()])),
+      getRun: vi.fn().mockResolvedValue(makeRun()),
     };
 
     server = createTestServer(mockApi);
@@ -51,27 +56,34 @@ describe('MCP Protocol Integration', () => {
     await server.close();
   });
 
-  it('should list all 16 tools', async () => {
+  it('should list all 23 tools', async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
 
     expect(names).toEqual([
+      'block_get',
       'block_list',
       'edge_create',
       'edge_delete',
+      'flow_clone',
       'flow_create',
+      'flow_export',
       'flow_graph',
       'flow_list',
       'flow_load',
       'flow_run',
+      'flow_run_from',
       'flow_save',
       'flow_update',
       'node_create',
       'node_delete',
+      'node_get',
       'node_get_port',
       'node_run',
       'node_update',
       'profile_get',
+      'run_get',
+      'run_list',
     ]);
   });
 

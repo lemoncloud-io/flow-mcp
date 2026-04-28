@@ -10,6 +10,7 @@ import type {
     PortData,
     BlockView,
     ProfileView,
+    RunView,
 } from './types';
 
 export class FlowApiClient {
@@ -52,13 +53,22 @@ export class FlowApiClient {
         return data;
     }
 
-    async listFlows(params?: { isPublic?: boolean }): Promise<ListResult<FlowView>> {
-        if (params?.isPublic) {
-            // Public endpoint is outside /_api_ prefix
-            const { data } = await this.client.get(`${this.baseUrl}/public/flows`);
+    async listFlows(opts?: {
+        isPublic?: boolean;
+        limit?: number;
+        offset?: number;
+        sort?: string;
+    }): Promise<ListResult<FlowView>> {
+        const params: Record<string, string | number> = {};
+        if (opts?.limit !== undefined) params.limit = opts.limit;
+        if (opts?.offset !== undefined) params.offset = opts.offset;
+        if (opts?.sort) params.sort = opts.sort;
+
+        if (opts?.isPublic) {
+            const { data } = await this.client.get(`${this.baseUrl}/public/flows`, { params });
             return data;
         }
-        const { data } = await this.client.get('/flows');
+        const { data } = await this.client.get('/flows', { params });
         return data;
     }
 
@@ -88,7 +98,27 @@ export class FlowApiClient {
         return data;
     }
 
+    // --- Run operations ---
+
+    async listRuns(opts?: { limit?: number; offset?: number }): Promise<ListResult<RunView>> {
+        const params: Record<string, number> = {};
+        if (opts?.limit !== undefined) params.limit = opts.limit;
+        if (opts?.offset !== undefined) params.offset = opts.offset;
+        const { data } = await this.client.get('/runs', { params });
+        return data;
+    }
+
+    async getRun(id: string): Promise<RunView> {
+        const { data } = await this.client.get(`/runs/${id}`);
+        return data;
+    }
+
     // --- Node operations ---
+
+    async getNode(id: string): Promise<NodeView> {
+        const { data } = await this.client.get(`/nodes/${id}`);
+        return data;
+    }
 
     async runNode(
         id: string,
@@ -117,6 +147,11 @@ export class FlowApiClient {
     }
 
     // --- Block operations ---
+
+    async getBlock(id: string): Promise<BlockView> {
+        const { data } = await this.client.get(`/blocks/${id}`);
+        return data;
+    }
 
     async listBlocks(forceRefresh = false): Promise<ListResult<BlockView>> {
         if (!forceRefresh && this.blockCache && Date.now() - this.blockCache.at < this.BLOCK_CACHE_TTL) {

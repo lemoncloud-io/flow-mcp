@@ -4,7 +4,8 @@ import type { FlowApiClient } from '../api-client';
 import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured } from '../ws-client';
 import { TERMINAL_STATES } from '../types';
-import { filterDefined, toolError, toolJson } from './helpers';
+import type { EdgeData } from '../types';
+import { filterDefined, makeProgressHandler, stripNodeRuntime, toolError, toolJson } from './helpers';
 
 const NodeDataSchema = z.object({
     type: z.string().describe('Block process type (e.g., "input-text", "text-transform"). Get from block_list.'),
@@ -21,6 +22,64 @@ const EdgeDataSchema = z.object({
     targetNodeId: z.string().describe('Target node ID or array index when creating.'),
     targetPortId: z.string().describe('Target port ID (e.g., "in"). Get from block inputs.'),
 });
+
+/** Remap edge node IDs from old IDs to index-based refs */
+const remapEdgesToIndices = (edges: EdgeData[], nodes: Array<{ id?: string }>) => {
+    const idToIndex = new Map(nodes.map((n, i) => [n.id, String(i)]));
+    return edges.map(e => ({
+        sourceNodeId: idToIndex.get(e.sourceNodeId) ?? e.sourceNodeId,
+        sourcePortId: e.sourcePortId,
+        targetNodeId: idToIndex.get(e.targetNodeId) ?? e.targetNodeId,
+        targetPortId: e.targetPortId,
+    }));
+};
+
+interface RunResultOpts {
+    client: FlowApiClient;
+    flowId: string;
+    expectedNodeIds: string[];
+    nodeStates: Map<string, string>;
+    timedOut: boolean;
+    startTime: number;
+    eventLog: Array<Record<string, unknown>>;
+    timeout?: number;
+    startNodeId?: string;
+}
+
+/** Build execution result from WS states, re-fetching on error/timeout */
+const buildRunResult = async (opts: RunResultOpts) => {
+    const { client, flowId, expectedNodeIds, nodeStates, timedOut, startTime, eventLog, timeout, startNodeId } = opts;
+    const hasError = [...nodeStates.values()].some(s => s === 'ERROR');
+    let nodes = expectedNodeIds.map(id => ({
+        id,
+        status: nodeStates.get(id) ?? 'UNKNOWN',
+        error: undefined as string | undefined,
+    }));
+
+    if (hasError || timedOut) {
+        const finalFlow = await client.loadFlow(flowId);
+        nodes = (finalFlow.nodes ?? [])
+            .filter(n => expectedNodeIds.includes(n.id ?? ''))
+            .map(n => ({
+                id: n.id ?? '',
+                status: nodeStates.get(n.id ?? '') ?? n.status ?? 'UNKNOWN',
+                error: n.errorMessage ?? n.error,
+            }));
+    }
+
+    const status = timedOut ? 'timeout' : hasError ? 'error' : 'completed';
+    return toolJson({
+        flowId,
+        ...(startNodeId && { startNodeId }),
+        status,
+        nodes,
+        duration: Date.now() - startTime,
+        eventLog,
+        ...(timedOut && {
+            message: `Timed out after ${timeout ?? 60_000}ms. ${nodes.filter(n => TERMINAL_STATES.has(n.status)).length}/${expectedNodeIds.length} nodes completed.`,
+        }),
+    });
+};
 
 export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiConfig: FlowApiConfig) => {
     server.registerTool(
@@ -56,12 +115,15 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
             description: "List user's flows. Use this first to see available flows before loading or running them.",
             inputSchema: z.object({
                 isPublic: z.optional(z.boolean()).describe('Filter public flows only'),
+                limit: z.optional(z.number().int().min(1).max(100)).describe('Max results per page'),
+                offset: z.optional(z.number().int().min(0)).describe('Pagination offset'),
+                sort: z.optional(z.enum(['asc', 'desc'])).describe('Sort by modified date'),
             }),
             annotations: { readOnlyHint: true },
         },
-        async ({ isPublic }) => {
+        async ({ isPublic, limit, offset, sort }) => {
             try {
-                const result = await client.listFlows(isPublic !== undefined ? { isPublic } : undefined);
+                const result = await client.listFlows({ isPublic, limit, offset, sort });
                 const summary = result.list.map(f => ({
                     id: f.id,
                     name: f.name,
@@ -70,7 +132,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     isPublic: f.isPublic,
                     modifiedAt: f.modifiedAt,
                 }));
-                return toolJson({ total: result.total, flows: summary });
+                return toolJson({ total: result.total, limit: result.limit, offset: result.offset, flows: summary });
             } catch (e) {
                 return toolError(e);
             }
@@ -120,7 +182,6 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 const icon = (s?: string) =>
                     s === 'COMPLETED' ? '✅' : s === 'ERROR' ? '❌' : s === 'RUNNING' ? '🔄' : '⚪';
 
-                // Mermaid
                 const mermaid = [
                     'graph LR',
                     ...nodes.map(n => {
@@ -130,7 +191,6 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     ...edges.map(e => `  ${e.sourceNodeId} --> ${e.targetNodeId}`),
                 ].join('\n');
 
-                // Compact summary
                 const connectedIds = new Set([...edges.map(e => e.sourceNodeId), ...edges.map(e => e.targetNodeId)]);
                 const orphans = nodes.filter(n => !connectedIds.has(n.id!));
                 const portValues = ports
@@ -270,6 +330,142 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
     );
 
     server.registerTool(
+        'flow_clone',
+        {
+            title: 'Clone Flow',
+            description:
+                'Clone an existing flow into a new flow. Copies all nodes, edges, and config. ' +
+                'Use to duplicate a flow as a starting point for modifications.',
+            inputSchema: z.object({
+                flowId: z.string().describe('Flow ID to clone'),
+                name: z.optional(z.string()).describe('Name for the cloned flow (default: original name + " (Copy)")'),
+            }),
+        },
+        async ({ flowId, name }) => {
+            try {
+                const source = await client.loadFlow(flowId);
+                const nodes = stripNodeRuntime(source.nodes ?? []);
+                const cloneName = name ?? `${source.name ?? 'Flow'} (Copy)`;
+
+                const created = await client.saveFlow('0', {
+                    name: cloneName,
+                    description: source.description,
+                    nodes,
+                    edges: [],
+                });
+
+                const sourceEdges = source.edges ?? [];
+                if (!sourceEdges.length || !created.nodes?.length) {
+                    return toolJson(created);
+                }
+
+                const indexEdges = remapEdgesToIndices(sourceEdges, source.nodes ?? []);
+                const resolvedEdges = indexEdges.map(e => ({
+                    sourceNodeId: resolveNodeId(e.sourceNodeId, created.nodes!),
+                    sourcePortId: e.sourcePortId,
+                    targetNodeId: resolveNodeId(e.targetNodeId, created.nodes!),
+                    targetPortId: e.targetPortId,
+                }));
+
+                const saved = await client.saveFlow(created.id, {
+                    name: cloneName,
+                    description: source.description,
+                    nodes: created.nodes!,
+                    edges: resolvedEdges,
+                });
+                return toolJson(saved);
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.registerTool(
+        'flow_export',
+        {
+            title: 'Export Flow',
+            description:
+                'Export flow as clean JSON that can be used with flow_create to recreate it. ' +
+                'Strips runtime fields (status, errors). Use for backup, sharing, or git storage.',
+            inputSchema: z.object({
+                flowId: z.string().describe('Flow ID to export'),
+            }),
+            annotations: { readOnlyHint: true },
+        },
+        async ({ flowId }) => {
+            try {
+                const flow = await client.loadFlow(flowId);
+                return toolJson({
+                    name: flow.name,
+                    description: flow.description,
+                    nodes: stripNodeRuntime(flow.nodes ?? []),
+                    edges: remapEdgesToIndices(flow.edges ?? [], flow.nodes ?? []),
+                });
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.registerTool(
+        'flow_run_from',
+        {
+            title: 'Run Flow From Node',
+            description:
+                'Execute a flow starting from a specific node with downstream propagation. ' +
+                'Useful for retrying from a failed node without re-running the entire flow.',
+            inputSchema: z.object({
+                flowId: z.string().describe('Flow ID'),
+                startNodeId: z.string().describe('Node ID to start execution from'),
+                timeout: z.optional(z.number()).describe('Max wait time in ms (default: 60000)'),
+            }),
+        },
+        async ({ flowId, startNodeId, timeout }, extra) => {
+            try {
+                const flow = await client.loadFlow(flowId);
+                const edges = flow.edges ?? [];
+                const allNodeIds = (flow.nodes ?? []).filter(n => !n.disabled && n.id).map(n => n.id!);
+                const downstreamIds = getDownstreamNodeIds(startNodeId, edges);
+                const expectedNodeIds = [startNodeId, ...downstreamIds].filter(id => allNodeIds.includes(id));
+
+                if (!isWsConfigured(apiConfig)) {
+                    const result = await client.runNode(startNodeId, { propagate: true });
+                    return toolJson(result);
+                }
+
+                const startTime = Date.now();
+                const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
+                    flowId,
+                    expectedNodeIds,
+                    timeout: timeout ?? 60_000,
+                    onProgress: makeProgressHandler(extra),
+                    triggerRun: async connectionId => {
+                        await client.runNode(startNodeId, {
+                            propagate: true,
+                            async: true,
+                            connection: connectionId,
+                        });
+                    },
+                });
+
+                return buildRunResult({
+                    client,
+                    flowId,
+                    expectedNodeIds,
+                    nodeStates,
+                    timedOut,
+                    startTime,
+                    eventLog,
+                    timeout,
+                    startNodeId,
+                });
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.registerTool(
         'flow_run',
         {
             title: 'Run Flow',
@@ -282,7 +478,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 timeout: z.optional(z.number()).describe('Max wait time in ms (default: 60000)'),
             }),
         },
-        async ({ flowId, config: runConfig, timeout }) => {
+        async ({ flowId, config: runConfig, timeout }, extra) => {
             try {
                 const body = runConfig ? { config: runConfig } : undefined;
 
@@ -293,57 +489,61 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 const startTime = Date.now();
 
-                // Load flow to find start nodes (nodes with no incoming edges)
                 const flow = await client.loadFlow(flowId);
                 const allNodeIds = (flow.nodes ?? []).filter(n => !n.disabled && n.id).map(n => n.id!);
                 const targetNodeIds = new Set((flow.edges ?? []).map(e => e.targetNodeId));
                 const startNodeIds = allNodeIds.filter(id => !targetNodeIds.has(id));
 
-                // Run each start node with propagate=true to trigger the full chain
                 const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
                     flowId,
                     expectedNodeIds: allNodeIds,
                     timeout: timeout ?? 60_000,
+                    onProgress: makeProgressHandler(extra),
                     triggerRun: async connectionId => {
                         const runOpts = { propagate: true, async: true, connection: connectionId };
                         await Promise.all(startNodeIds.map(nodeId => client.runNode(nodeId, runOpts)));
                     },
                 });
 
-                // Build result from pre-run flow + WS states; only re-fetch if errors detected
-                const hasError = [...nodeStates.values()].some(s => s === 'ERROR');
-                let nodes = allNodeIds.map(id => ({
-                    id,
-                    status: nodeStates.get(id) ?? 'UNKNOWN',
-                    error: undefined as string | undefined,
-                }));
-
-                if (hasError || timedOut) {
-                    const finalFlow = await client.loadFlow(flowId);
-                    nodes = (finalFlow.nodes ?? []).map(n => ({
-                        id: n.id ?? '',
-                        status: nodeStates.get(n.id ?? '') ?? n.status ?? 'UNKNOWN',
-                        error: n.errorMessage ?? n.error,
-                    }));
-                }
-
-                const status = timedOut ? 'timeout' : hasError ? 'error' : 'completed';
-
-                return toolJson({
+                return buildRunResult({
+                    client,
                     flowId,
-                    status,
-                    nodes,
-                    duration: Date.now() - startTime,
+                    expectedNodeIds: allNodeIds,
+                    nodeStates,
+                    timedOut,
+                    startTime,
                     eventLog,
-                    ...(timedOut && {
-                        message: `Timed out after ${timeout ?? 60_000}ms. ${nodes.filter(n => TERMINAL_STATES.has(n.status)).length}/${allNodeIds.length} nodes completed.`,
-                    }),
+                    timeout,
                 });
             } catch (e) {
                 return toolError(e);
             }
         },
     );
+};
+
+/** BFS to find all downstream node IDs from a start node */
+export const getDownstreamNodeIds = (startId: string, edges: EdgeData[]): string[] => {
+    const adj = new Map<string, string[]>();
+    for (const e of edges) {
+        const targets = adj.get(e.sourceNodeId);
+        if (targets) targets.push(e.targetNodeId);
+        else adj.set(e.sourceNodeId, [e.targetNodeId]);
+    }
+
+    const result: string[] = [];
+    const visited = new Set<string>();
+    const queue = [startId];
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        if (current !== startId) result.push(current);
+        for (const target of adj.get(current) ?? []) {
+            if (!visited.has(target)) queue.push(target);
+        }
+    }
+    return result;
 };
 
 export const resolveNodeId = (ref: string, nodes: Array<{ id?: string }>): string => {

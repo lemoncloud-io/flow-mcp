@@ -3,9 +3,31 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { FlowApiClient } from '../api-client';
 import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured } from '../ws-client';
-import { filterDefined, toolError, toolJson } from './helpers';
+import { filterDefined, makeProgressHandler, toolError, toolJson } from './helpers';
 
 export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiConfig: FlowApiConfig) => {
+    server.registerTool(
+        'node_get',
+        {
+            title: 'Get Node',
+            description:
+                'Get a single node by ID. Faster than flow_load when you only need one node. ' +
+                'Returns type, config, position, status, and error info.',
+            inputSchema: z.object({
+                nodeId: z.string().describe('Node ID'),
+            }),
+            annotations: { readOnlyHint: true },
+        },
+        async ({ nodeId }) => {
+            try {
+                const result = await client.getNode(nodeId);
+                return toolJson(result);
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
     server.registerTool(
         'node_create',
         {
@@ -56,7 +78,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 timeout: z.optional(z.number()).describe('Max wait time in ms (default: 30000)'),
             }),
         },
-        async ({ nodeId, flowId, propagate, config: runConfig, timeout }) => {
+        async ({ nodeId, flowId, propagate, config: runConfig, timeout }, extra) => {
             try {
                 const opts = { propagate: propagate ?? false, config: runConfig };
 
@@ -71,6 +93,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     flowId,
                     expectedNodeIds: [nodeId],
                     timeout: timeout ?? 30_000,
+                    onProgress: makeProgressHandler(extra),
                     triggerRun: connectionId =>
                         client.runNode(nodeId, { ...opts, async: true, connection: connectionId }).then(() => {}),
                 });
@@ -85,7 +108,6 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     eventLog,
                 };
 
-                // Only fetch flow details for error info or timeout
                 if (status === 'ERROR' || timedOut) {
                     const finalFlow = await client.loadFlow(flowId);
                     const node = (finalFlow.nodes ?? []).find(n => n.id === nodeId);

@@ -93,7 +93,12 @@ describe('flow tool handlers', () => {
 
       await handlers.flow_list({ isPublic: undefined });
 
-      expect(mockClient.listFlows).toHaveBeenCalledWith(undefined);
+      expect(mockClient.listFlows).toHaveBeenCalledWith({
+        isPublic: undefined,
+        limit: undefined,
+        offset: undefined,
+        sort: undefined,
+      });
     });
 
     it('should return toolError on API failure', async () => {
