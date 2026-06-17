@@ -202,7 +202,12 @@ export class FlowApiClient {
     // --- Error helpers ---
 
     private normalizeError(error: AxiosError): FlowApiError {
-        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        if (
+            error.code === 'ECONNABORTED' ||
+            error.code === 'ETIMEDOUT' ||
+            error.code === 'ERR_CANCELED' ||
+            error.message?.includes('timeout')
+        ) {
             return new FlowApiError(
                 'timeout',
                 `Execution timed out (${this.timeout}ms). The flow may still be running on the server. ` +

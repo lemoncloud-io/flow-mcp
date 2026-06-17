@@ -92,8 +92,22 @@ export const executeWithWs = (
 
         const resetQuietTimer = () => {
             if (quietTimer) clearTimeout(quietTimer);
-            quietTimer = setTimeout(() => {
-                if (!settled && eventLog.length > 0) settle(false);
+            quietTimer = setTimeout(async () => {
+                if (settled || eventLog.length === 0) return;
+                // WS went quiet — the backend may not emit a terminal event for every node, so confirm
+                // real state via API before settling. A stalled (non-terminal) node must NOT be reported
+                // as completed: keep polling until all terminal or the main timeout fires.
+                try {
+                    const snapshot = await checkNodeStatesViaApi(client, flowId, expectedNodeIds);
+                    if (snapshot) {
+                        for (const [id, state] of snapshot) nodeStates.set(id, state);
+                        settle(false);
+                        return;
+                    }
+                } catch {
+                    /* API check failed — retry on the next quiet period */
+                }
+                if (!settled) resetQuietTimer();
             }, QUIET_PERIOD);
         };
 
@@ -139,7 +153,22 @@ export const executeWithWs = (
         });
 
         ws.on('close', () => {
-            if (!settled) fail(new Error('WebSocket connection closed unexpectedly'));
+            if (settled) return;
+            // The socket can close right after the run is triggered but before terminal events arrive.
+            // Confirm via API before declaring failure so a completed run isn't reported as an error.
+            checkNodeStatesViaApi(client, flowId, expectedNodeIds)
+                .then(snapshot => {
+                    if (settled) return;
+                    if (snapshot) {
+                        for (const [id, state] of snapshot) nodeStates.set(id, state);
+                        settle(false);
+                    } else {
+                        fail(new Error('WebSocket connection closed unexpectedly'));
+                    }
+                })
+                .catch(() => {
+                    if (!settled) fail(new Error('WebSocket connection closed unexpectedly'));
+                });
         });
 
         ws.on('message', data => {

@@ -4,6 +4,7 @@ export interface ListResult<T> {
     total: number;
     limit?: number;
     offset?: number;
+    page?: number;
     list: T[];
 }
 

@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { FlowApiClient } from '../api-client';
 import type { ProductView, TransactionView, WalletView } from '../types';
-import { toolError, toolResult } from './helpers';
+import { mcpLog, toolError, toolResult } from './helpers';
 import { completableProductId } from './completions';
 import {
     PassthroughSchema,
@@ -108,6 +108,9 @@ export const registerCreditTools = (server: McpServer, client: FlowApiClient) =>
         async ({ productId, requestId }) => {
             try {
                 const idem = requestId ?? randomUUID();
+                // Surface the idempotency key BEFORE charging so it survives a lost response — the caller
+                // can reuse it to retry without double-charging instead of generating a fresh UUID.
+                mcpLog(server, 'info', `Purchasing ${productId} with requestId=${idem} (reuse to retry safely)`);
                 const transaction = await client.purchaseCredits(productId, idem);
                 // Best-effort balance refresh — purchase already succeeded.
                 const balance = await client
@@ -144,7 +147,7 @@ export const registerCreditTools = (server: McpServer, client: FlowApiClient) =>
                 const transactions = (result.list ?? []).map(summarizeTransaction);
                 return toolResult({
                     total: result.total ?? transactions.length,
-                    page,
+                    page: result.page ?? page,
                     limit: result.limit,
                     transactions,
                 });

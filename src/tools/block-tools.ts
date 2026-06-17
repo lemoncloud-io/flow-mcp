@@ -65,9 +65,10 @@ export const registerBlockTools = (server: McpServer, client: FlowApiClient) => 
 
 /** Fetch a block by id; resolve processType/name/label via the catalog. */
 const resolveBlock = async (client: FlowApiClient, blockId: string): Promise<BlockView> => {
-    // Numeric → real block ID; fetch directly. Non-numeric → processType/name/label, resolve via catalog
-    // (avoids a speculative GET /blocks/:id that 404s and spams backend error-reporting).
-    if (/^\d+$/.test(blockId)) return await client.getBlock(blockId);
+    // Numeric & non-zero → real block ID; fetch directly. Non-numeric (or the "0" sentinel) →
+    // processType/name/label, resolve via catalog (avoids a speculative GET /blocks/:id that 404s
+    // and spams backend error-reporting; "0" is the backend's new-record sentinel, never a real block).
+    if (/^\d+$/.test(blockId) && Number(blockId) !== 0) return await client.getBlock(blockId);
 
     const { list } = await client.listBlocks();
     const match = list.find(

@@ -90,6 +90,7 @@ const makeDispatcher =
             return toolError(new Error(`Unknown action "${action}". Allowed: ${allowed.join(', ')}`));
         }
         const def = captured[action];
+        if (!def) return toolError(new Error(`No handler captured for action "${action}"`));
         const schema = def.meta.inputSchema;
         const parsed = schema ? z.safeParse(schema, params ?? {}) : { success: true as const, data: params ?? {} };
         if (!parsed.success) {
