@@ -21,6 +21,7 @@ src/
 │   ├── block-tools.ts  # 2 block tools (get/list with cache)
 │   ├── run-tools.ts    # 2 run tools (list/get execution history)
 │   ├── credit-tools.ts # 4 credit tools (balance/packs/purchase/history)
+│   ├── dispatch.ts     # registers the public surface: flow_read/flow_do/credit_read/credit_do (route action→captured handler)
 │   └── index.ts        # barrel export
 ├── ws-client.ts        # WebSocket client for real-time execution monitoring + progress callbacks
 ├── server.ts           # McpServer setup + registerTool
@@ -30,6 +31,7 @@ src/
 
 ## Key Patterns
 
+- **4-tool public surface**: `server.ts` registers only `flow_read` (11 read actions), `flow_do` (13 write/run actions), `credit_read` (3 read actions), and `credit_do` (1 purchase action) via `registerDispatchTools` — split by **domain × access** so users approve 4 tools, not 28, and the read tools carry `readOnlyHint`. The 28 granular `registerXTools` still define the real handlers + Zod schemas; `dispatch.ts` registers them against a fake server to **capture** their `{meta, handler}`, then routes `{action, params}` → the captured handler (params re-validated against the original schema; logging delegated to the real server). `FLOW_READ_ACTIONS`/`FLOW_DO_ACTIONS`/`CREDIT_READ_ACTIONS`/`CREDIT_DO_ACTIONS` must stay in sync with the granular tools and be pairwise disjoint — `dispatch.test.ts` enforces this. (Only the `*_read` tools are `readOnlyHint`; the `*_do` tools mutate/charge.)
 - **MCP SDK v1.29** with v2 API (`McpServer` + `registerTool`)
 - **Zod v4** for input schemas (`import * as z from 'zod/v4'`)
 - **Error handling**: tool handlers return `{ isError: true, content: [...], structuredContent: { error, code? } }`, never throw

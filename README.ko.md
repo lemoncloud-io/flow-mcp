@@ -172,40 +172,31 @@ npm install -g @lemoncloud/flow-mcp
 "1004897 플로우 비공개로 바꿔"   → 비공개로 전환
 ```
 
-## 28개 도구
+## 4개 도구, 28개 액션
 
-자연어로 요청하면 Claude가 자동으로 적절한 도구를 선택합니다.
+flow-mcp는 도구가 **4개**뿐 — 권한 승인을 28번이 아니라 몇 번만 하면 됩니다. 도메인(flow / credit) × 접근(**read** 읽기 / **do** 쓰기)으로 나뉘어, 읽기 도구는 read-only로 표시되고 ⚠️ 변경·결제는 `*_do` 도구에만 모여 있습니다. 이름으로 직접 부를 일 없이, 그냥 Claude에게 말하면("플로우 공개해줘", "크레딧 확인") 알맞은 액션을 자동 선택합니다.
 
-| 도구 | 하는 일 |
-|------|--------|
-| `profile_get` | API 키 + AI 제공자 설정 상태 확인 |
-| `block_list` | 사용 가능한 블록 종류 조회 |
-| `block_get` | 블록 상세 조회 (ID 또는 이름) |
-| `flow_list` | 내 워크플로우 목록 (페이지네이션 지원) |
-| `flow_load` | 워크플로우 상세 로드 (노드, 엣지, 포트) |
-| `flow_graph` | Mermaid 다이어그램 시각화 |
-| `flow_create` | 새 워크플로우 생성 (노드+엣지 한 번에) |
-| `flow_update` | 워크플로우 이름/설명 변경 |
-| `flow_publish` | 워크플로우 공개 전환 (또는 비공개로) |
-| `flow_save` | 전체 재구성 (주의: 기존 노드 ID 변경됨) |
-| `flow_clone` | 워크플로우 복제 |
-| `flow_export` | 워크플로우 JSON 내보내기 |
-| `flow_run` | 워크플로우 실행 + 실시간 모니터링 |
-| `flow_run_from` | 특정 노드부터 실행 |
-| `node_get` | 단일 노드 상세 조회 |
-| `node_create` | 기존 flow에 노드 추가 |
-| `node_run` | 단일 노드 실행 |
-| `node_get_port` | 노드 입출력 데이터 조회 |
-| `node_update` | 노드 설정/라벨/위치 등 수정 |
-| `node_delete` | 노드 삭제 |
-| `edge_create` | 두 노드 연결 |
-| `edge_delete` | 연결 제거 |
-| `run_list` | 실행 이력 조회 (토큰 사용량 포함) |
-| `run_get` | 실행 상세 조회 |
-| `credit_balance` | 크레딧 잔액 확인 (총/가용/홀드) |
-| `credit_packs` | 구매 가능한 크레딧 팩 + USD 가격 조회 |
-| `credit_purchase` | 등록된 카드로 크레딧 충전 (브라우저 불필요) |
-| `credit_history` | 크레딧 내역 조회 (충전 + 사용) |
+### `flow_read` — 플로우 읽기 (read-only)
+
+`{ action, params }` · 액션:
+`profile_get` · `flow_list` · `flow_load` · `flow_graph` · `flow_export` · `node_get` · `node_get_port` · `block_get` · `block_list` · `run_list` · `run_get`
+
+### `flow_do` — 플로우 수정 & 실행 ⚠️
+
+`{ action, params }` · 액션:
+`flow_create` · `flow_update` · `flow_publish` · `flow_save` · `flow_clone` · `flow_run` · `flow_run_from` · `node_create` · `node_run` · `node_update` · `node_delete` · `edge_create` · `edge_delete`
+
+### `credit_read` — 크레딧 읽기 (read-only)
+
+`{ action, params }` · 액션:
+`credit_balance` · `credit_packs` · `credit_history`
+
+### `credit_do` — 크레딧 충전 ⚠️
+
+`{ action, params }` · 액션:
+`credit_purchase`
+
+> 사용하는 도구마다 **"Always allow" 한 번**씩이면 끝 — 더 이상 프롬프트 없음. 읽기 도구 2개는 read-only라 안심하고 허용 가능, 무언가를 바꾸거나 카드를 결제하는 건 `*_do` 도구뿐입니다.
 
 ---
 
@@ -254,7 +245,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 28 tools)
+  -> server.ts (McpServer + 4 dispatch tools -> 28 actions)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)

@@ -62,29 +62,9 @@
   },
   "tools_generated": true,
   "tools": [
-    {
-      "name": "flow_create",
-      "description": "Create a visual workflow"
-    },
-    {
-      "name": "flow_run",
-      "description": "Run a workflow with real-time monitoring"
-    },
-    {
-      "name": "flow_publish",
-      "description": "Open a flow as public"
-    },
-    {
-      "name": "credit_balance",
-      "description": "Check credit balance"
-    },
-    {
-      "name": "credit_purchase",
-      "description": "Top up credits with the card on file"
-    },
-    {
-      "name": "credit_history",
-      "description": "Review credit usage and top-ups"
-    }
+    { "name": "flow_read", "description": "Read flows: list, load, export, graph; inspect nodes, ports, blocks, run history (read-only)" },
+    { "name": "flow_do", "description": "Edit & run flows: create, update, publish, save, clone, run; node + edge changes" },
+    { "name": "credit_read", "description": "Read credits: balance, purchasable packs, history (read-only)" },
+    { "name": "credit_do", "description": "Purchase credits: top up with the card on file" }
   ]
 }

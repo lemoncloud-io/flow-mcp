@@ -63,19 +63,18 @@ export const registerBlockTools = (server: McpServer, client: FlowApiClient) => 
     );
 };
 
-/** Fetch a block by id; fall back to resolving processType/name/label via the catalog. */
+/** Fetch a block by id; resolve processType/name/label via the catalog. */
 const resolveBlock = async (client: FlowApiClient, blockId: string): Promise<BlockView> => {
-    try {
-        return await client.getBlock(blockId);
-    } catch (e) {
-        if (!(e instanceof FlowApiError) || e.code !== 'not_found') throw e;
-        const { list } = await client.listBlocks();
-        const match = list.find(
-            b => b.id === blockId || b.processType === blockId || b.name === blockId || b.label === blockId,
-        );
-        if (!match) throw e;
-        return match.id && match.id !== blockId ? await client.getBlock(match.id) : match;
-    }
+    // Numeric → real block ID; fetch directly. Non-numeric → processType/name/label, resolve via catalog
+    // (avoids a speculative GET /blocks/:id that 404s and spams backend error-reporting).
+    if (/^\d+$/.test(blockId)) return await client.getBlock(blockId);
+
+    const { list } = await client.listBlocks();
+    const match = list.find(
+        b => b.id === blockId || b.processType === blockId || b.name === blockId || b.label === blockId,
+    );
+    if (!match) throw new FlowApiError('not_found', `Block not found: ${blockId}`);
+    return match;
 };
 
 export const summarizeBlock = (b: BlockView) => ({

@@ -25,7 +25,8 @@ export class FlowApiClient {
 
     constructor(config: FlowApiConfig) {
         this.baseUrl = config.FLOW_API_URL.replace(/\/+$/, '');
-        const apiPath = resolveApiPath(config.FLOW_API_KEY);
+        // Backend serves the API only under /_api_ (the legacy /_apis route was removed 2026-04-30).
+        const apiPath = '/_api_';
         this.timeout = config.FLOW_API_TIMEOUT;
 
         this.client = axios.create({
@@ -230,12 +231,6 @@ export class FlowApiClient {
         return new FlowApiError('api', `API error (${status ?? 'network'}): ${message}`);
     }
 }
-
-/** Resolve API path prefix based on API key format (matches frontend routing logic) */
-const resolveApiPath = (apiKey: string): string => {
-    if (apiKey.startsWith('ec-')) return '/_api_';
-    return '/_apis';
-};
 
 export type FlowApiErrorCode = 'auth' | 'payment' | 'not_found' | 'timeout' | 'api';
 

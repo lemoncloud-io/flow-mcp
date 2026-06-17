@@ -16,19 +16,19 @@ describe('FlowApiClient', () => {
     it('should strip trailing slash from FLOW_API_URL', () => {
       const { axiosInstance } = createClient({ FLOW_API_URL: 'https://api.example.com///' });
 
-      expect(axiosInstance.defaults.baseURL).toMatch(/^https:\/\/api\.example\.com\/_apis$/);
+      expect(axiosInstance.defaults.baseURL).toMatch(/^https:\/\/api\.example\.com\/_api_$/);
     });
 
-    it('should use /_api_ path for ec- prefixed keys', () => {
+    it('should use the /_api_ path for ec- prefixed keys', () => {
       const { axiosInstance } = createClient({ FLOW_API_KEY: 'ec-test-key' });
 
       expect(axiosInstance.defaults.baseURL).toContain('/_api_');
     });
 
-    it('should use /_apis path for non-ec keys', () => {
+    it('should use the /_api_ path regardless of key format', () => {
       const { axiosInstance } = createClient({ FLOW_API_KEY: 'normal-key' });
 
-      expect(axiosInstance.defaults.baseURL).toContain('/_apis');
+      expect(axiosInstance.defaults.baseURL).toContain('/_api_');
     });
 
     it('should set x-api-key header', () => {

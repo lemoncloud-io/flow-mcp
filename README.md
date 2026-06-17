@@ -172,40 +172,31 @@ npm install -g @lemoncloud/flow-mcp
 "Make flow 1004897 private"   → unpublishes it
 ```
 
-## 28 Tools
+## 4 Tools, 28 Actions
 
-Claude automatically selects the right tool based on your request.
+flow-mcp exposes just **four** tools — so you approve permissions a handful of times, not 28. They split by domain (flow / credit) and by access (**read** vs **do**), so the read tools are marked read-only and the "do" tools are where the ⚠️ writes and charges live. You never call them by name; just talk to Claude ("publish my flow", "check my credits") and it picks the right action.
 
-| Tool | What it does |
-|------|-------------|
-| `profile_get` | Check API key + AI provider config status |
-| `block_list` | List available block types |
-| `block_get` | Get block details by ID or name |
-| `flow_list` | List your workflows (with pagination) |
-| `flow_load` | Load full flow state (nodes, edges, ports) |
-| `flow_graph` | Mermaid diagram visualization |
-| `flow_create` | Create new flow (nodes + edges at once) |
-| `flow_update` | Update flow name / description |
-| `flow_publish` | Open a flow as public (or make private) |
-| `flow_save` | Full rebuild (caution: reassigns node IDs) |
-| `flow_clone` | Duplicate a flow |
-| `flow_export` | Export flow as portable JSON |
-| `flow_run` | Execute flow + real-time monitoring |
-| `flow_run_from` | Run flow from a specific node |
-| `node_get` | Get single node details |
-| `node_create` | Add node to existing flow |
-| `node_run` | Execute single node |
-| `node_get_port` | Inspect node input/output data |
-| `node_update` | Update node config / label / position |
-| `node_delete` | Delete a node |
-| `edge_create` | Connect two nodes |
-| `edge_delete` | Remove a connection |
-| `run_list` | List execution history with token usage |
-| `run_get` | Get execution run details |
-| `credit_balance` | Check credit balance (total / available / held) |
-| `credit_packs` | List purchasable credit packs + USD price |
-| `credit_purchase` | Buy credits with card on file (headless) |
-| `credit_history` | Review credit ledger (top-ups + spend) |
+### `flow_read` — read flows (read-only)
+
+`{ action, params }` · Actions:
+`profile_get` · `flow_list` · `flow_load` · `flow_graph` · `flow_export` · `node_get` · `node_get_port` · `block_get` · `block_list` · `run_list` · `run_get`
+
+### `flow_do` — edit & run flows ⚠️
+
+`{ action, params }` · Actions:
+`flow_create` · `flow_update` · `flow_publish` · `flow_save` · `flow_clone` · `flow_run` · `flow_run_from` · `node_create` · `node_run` · `node_update` · `node_delete` · `edge_create` · `edge_delete`
+
+### `credit_read` — read credits (read-only)
+
+`{ action, params }` · Actions:
+`credit_balance` · `credit_packs` · `credit_history`
+
+### `credit_do` — purchase credits ⚠️
+
+`{ action, params }` · Actions:
+`credit_purchase`
+
+> Click **"Always allow"** once for each tool you use and you're set — no more prompts. The two read tools are read-only and safe to allow; the `*_do` tools are the only ones that change anything or charge your card.
 
 ---
 
@@ -254,7 +245,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 28 tools)
+  -> server.ts (McpServer + 4 dispatch tools -> 28 actions)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)

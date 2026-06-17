@@ -171,7 +171,7 @@ describe('block_get handler', () => {
 
   const parse = (result: unknown) => JSON.parse((result as { content: Array<{ text: string }> }).content[0].text);
 
-  it('should return the block directly when getBlock succeeds (by id)', async () => {
+  it('should fetch directly via getBlock for a numeric block ID', async () => {
     mockClient.getBlock.mockResolvedValue(makeBlock({ id: '0008', processType: 'input-text' }));
 
     const result = await handlers.block_get({ blockId: '0008' });
@@ -181,33 +181,41 @@ describe('block_get handler', () => {
     expect(parse(result).type).toBe('input-text');
   });
 
-  it('should fall back to the catalog when getBlock 404s, resolving by processType', async () => {
-    mockClient.getBlock
-      .mockRejectedValueOnce(new FlowApiError('not_found', 'Not found'))
-      .mockResolvedValueOnce(makeBlock({ id: '0008', processType: 'input-text' }));
+  it('should resolve a processType via the catalog without calling getBlock', async () => {
     mockClient.listBlocks.mockResolvedValue(makeListResult([makeBlock({ id: '0008', processType: 'input-text' })]));
 
     const result = await handlers.block_get({ blockId: 'input-text' });
 
     expect(mockClient.listBlocks).toHaveBeenCalled();
-    expect(mockClient.getBlock).toHaveBeenLastCalledWith('0008');
+    expect(mockClient.getBlock).not.toHaveBeenCalled();
     expect((result as { isError?: boolean }).isError).toBeUndefined();
     expect(parse(result).type).toBe('input-text');
   });
 
-  it('should return toolError when 404 and no catalog match', async () => {
-    mockClient.getBlock.mockRejectedValue(new FlowApiError('not_found', 'Not found'));
-    mockClient.listBlocks.mockResolvedValue(makeListResult([makeBlock({ id: 'x', processType: 'other' })]));
+  it('should resolve a name/label via the catalog', async () => {
+    mockClient.listBlocks.mockResolvedValue(
+      makeListResult([makeBlock({ id: '0008', processType: 'input-text', name: '텍스트 입력' })]),
+    );
+
+    const result = await handlers.block_get({ blockId: '텍스트 입력' });
+
+    expect(mockClient.getBlock).not.toHaveBeenCalled();
+    expect(parse(result).type).toBe('input-text');
+  });
+
+  it('should return toolError when a non-numeric id has no catalog match', async () => {
+    mockClient.listBlocks.mockResolvedValue(makeListResult([makeBlock({ id: '0008', processType: 'other' })]));
 
     const result = await handlers.block_get({ blockId: 'nope' });
 
+    expect(mockClient.getBlock).not.toHaveBeenCalled();
     expect((result as { isError: boolean }).isError).toBe(true);
   });
 
-  it('should not fall back on non-not_found errors', async () => {
-    mockClient.getBlock.mockRejectedValue(new FlowApiError('auth', 'bad key'));
+  it('should return toolError when a numeric id 404s', async () => {
+    mockClient.getBlock.mockRejectedValue(new FlowApiError('not_found', 'Not found'));
 
-    const result = await handlers.block_get({ blockId: 'x' });
+    const result = await handlers.block_get({ blockId: '9999' });
 
     expect((result as { isError: boolean }).isError).toBe(true);
     expect(mockClient.listBlocks).not.toHaveBeenCalled();
