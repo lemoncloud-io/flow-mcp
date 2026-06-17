@@ -8,3 +8,4 @@ coverage/
 refer/
 *.mcpb
 .mcpb-build/
+.DS_Store
