@@ -50,7 +50,7 @@ No code required. No tool names to remember. Just ask in natural language.
 
 ## Quick Start
 
-> **You'll need:** the [**Claude Desktop**](https://claude.ai/download) app installed, and a free Eureka account (just sign in with Google — no signup form).
+> **You'll need:** the [**Claude Desktop**](https://claude.ai/download) app installed, and a free Eureka account (just sign in with Google — no signup form). Claude Desktop bundles its own Node.js runtime, so there's nothing else to install.
 
 ### 🚀 One-Click Install — Claude Desktop (recommended, no terminal)
 
@@ -60,6 +60,7 @@ No code required. No tool names to remember. Just ask in natural language.
    - *Mac says "unidentified developer"?* Right-click the file → **Open** → **Open**. That's normal for downloads.
    - *No install window appeared?* Open Claude Desktop → **Settings → Extensions** and drag the file in.
 4. **Check it works.** Ask Claude *"Show my flows"*. If it answers at all — even *"you have no flows yet"* — you're connected! 🎉 Then try *"Create a flow"* or *"Check my credit balance"*.
+   - *See a red error or "server disconnected" instead?* Open **Settings → Extensions**, confirm flow-mcp is enabled, and re-paste your API key.
 
 > One key unlocks everything — **flows** and **billing credits**. Nothing technical to edit.
 
@@ -150,6 +151,8 @@ npm install -g @lemoncloud/flow-mcp
 ```
 
 ### Manage Credits
+
+> **First top-up?** Add a card at **[billing.eureka.codes](https://billing.eureka.codes)** first. Balance, packs, and history work without one — but a purchase needs a card on file.
 
 ```
 "Check my credit balance"

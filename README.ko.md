@@ -50,7 +50,7 @@ AI에게 이렇게 말하면 됩니다:
 
 ## 시작하기
 
-> **준비물:** [**Claude Desktop**](https://claude.ai/download) 앱 설치, 그리고 무료 Eureka 계정(Google 로그인만 하면 됨 — 별도 가입 양식 없음).
+> **준비물:** [**Claude Desktop**](https://claude.ai/download) 앱 설치, 그리고 무료 Eureka 계정(Google 로그인만 하면 됨 — 별도 가입 양식 없음). Claude Desktop에 Node.js 런타임이 내장돼 있어 추가로 설치할 건 없습니다.
 
 ### 🚀 원클릭 설치 — Claude Desktop (추천, 터미널 불필요)
 
@@ -60,6 +60,7 @@ AI에게 이렇게 말하면 됩니다:
    - *Mac이 "확인되지 않은 개발자" 경고?* 파일 우클릭 → **열기** → **열기**. 다운로드 파일에선 정상입니다.
    - *설치 창이 안 뜨면?* Claude Desktop → **설정 → 확장(Extensions)** 에서 파일을 끌어다 놓으세요.
 4. **작동 확인.** Claude에게 *"내 flow 목록 보여줘"*. 뭐라도 답하면 — *"flow가 없습니다"* 라고 해도 — 연결 성공! 🎉 이어서 *"플로우 만들어줘"* 또는 *"내 크레딧 잔액 확인해줘"*.
+   - *빨간 오류나 "server disconnected"가 보이면?* **설정 → 확장(Extensions)** 에서 flow-mcp가 켜져 있는지 확인하고 API 키를 다시 붙여넣으세요.
 
 > 키 하나로 **플로우 + 크레딧(빌링)** 모두 사용 가능. 편집할 설정 파일도, 어려운 것도 없습니다.
 
@@ -150,6 +151,8 @@ npm install -g @lemoncloud/flow-mcp
 ```
 
 ### 크레딧 관리
+
+> **처음 충전하나요?** 먼저 **[billing.eureka.codes](https://billing.eureka.codes)** 에서 카드를 등록하세요. 잔액·팩·내역은 카드 없이도 되지만, 결제에는 등록된 카드가 필요합니다.
 
 ```
 "내 크레딧 잔액 확인해줘"
