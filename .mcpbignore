@@ -1,0 +1,36 @@
+# Source & tests (only built dist/ ships)
+src/
+tests/
+coverage/
+*.ts
+!dist/**/*.d.ts
+
+# Dev config
+.github/
+.husky/
+.idea/
+.claude/
+.vscode/
+tsconfig.json
+vitest.config.ts
+eslint.config.mjs
+.eslintrc*
+.prettierrc
+.prettierignore
+.releaserc.json
+.mcpbignore
+.gitignore
+
+# Secrets & local
+.env
+.env.*
+*.map
+
+# Build artifacts
+*.mcpb
+.mcpb-build/
+
+# Docs we don't need in the bundle (README stays)
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md

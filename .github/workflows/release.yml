@@ -60,6 +60,18 @@ jobs:
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Build & attach Desktop Extension (.mcpb)
+        if: success() && steps.version.outputs.released == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          npm prune --omit=dev
+          node scripts/sync-manifest.mjs "$VERSION"
+          npx -y @anthropic-ai/mcpb@latest pack . flow-mcp.mcpb
+          gh release upload "v$VERSION" flow-mcp.mcpb --clobber
+
       - name: Prepare Slack message
         if: success() && steps.version.outputs.released == 'true'
         id: slack-message

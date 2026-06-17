@@ -50,19 +50,33 @@ No code required. No tool names to remember. Just ask in natural language.
 
 ## Quick Start
 
-### Step 1: Install
+> **You'll need:** the [**Claude Desktop**](https://claude.ai/download) app installed, and a free Eureka account (just sign in with Google — no signup form).
+
+### 🚀 One-Click Install — Claude Desktop (recommended, no terminal)
+
+1. **Get your free API key.** Open **[flow.eureka.codes](https://flow.eureka.codes)** and **sign in with Google**. You're taken straight to a **Create Key** page — click **Create Key**, then **Copy**. The key looks like `ec-…`. **Paste it somewhere safe right now** (a notes app) — it's shown only once, but if you lose it you can just make a new one.
+2. **Download the extension.** On the [**Releases page**](https://github.com/lemoncloud-io/flow-mcp/releases/latest), open the **Assets** section and download **`flow-mcp.mcpb`**. *(Ignore the "Source code" files — you don't need those.)*
+3. **Install it.** Double-click **`flow-mcp.mcpb`**. Claude Desktop opens an **install window** — paste your API key, then click **Install**.
+   - *Mac says "unidentified developer"?* Right-click the file → **Open** → **Open**. That's normal for downloads.
+   - *No install window appeared?* Open Claude Desktop → **Settings → Extensions** and drag the file in.
+4. **Check it works.** Ask Claude *"Show my flows"*. If it answers at all — even *"you have no flows yet"* — you're connected! 🎉 Then try *"Create a flow"* or *"Check my credit balance"*.
+
+> One key unlocks everything — **flows** and **billing credits**. Nothing technical to edit.
+
+### Other clients (Cursor · Windsurf · VS Code · Claude Code)
+
+<details>
+<summary><b>Manual install</b> (npm + config file)</summary>
+
+**1. Install**
 
 ```bash
 npm install -g @lemoncloud/flow-mcp
 ```
 
-### Step 2: Get an API Key
+**2. Get an API key** — [flow.eureka.codes](https://flow.eureka.codes) → sign in with Google → **Create Key** → **Copy** (`ec-…`, shown once).
 
-Get your API key from [Eureka Codes Console](https://console.eureka.codes).
-
-### Step 3: Configure Your MCP Client
-
-**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**3. Add to your client's MCP config.** Claude Desktop file: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
@@ -71,22 +85,19 @@ Get your API key from [Eureka Codes Console](https://console.eureka.codes).
       "command": "npx",
       "args": ["-y", "@lemoncloud/flow-mcp"],
       "env": {
-        "FLOW_API_KEY": "your-api-key"
+        "FLOW_API_KEY": "ec-your-key"
       }
     }
   }
 }
 ```
 
-**Cursor / Windsurf** — add the same `mcpServers` config to your IDE's MCP settings.
+- **Cursor / Windsurf / VS Code (Continue/Cline):** add the same `mcpServers` block to the IDE's MCP settings.
+- **Claude Code:** `claude mcp add flow-mcp -e FLOW_API_KEY=ec-your-key -- npx -y @lemoncloud/flow-mcp`
 
-### Step 4: Go!
+**4. Restart** your client and say **"Show my flows"**.
 
-Restart your client and say **"Show my flows"**.
-
-> **Note:** Only `FLOW_API_KEY` is required. API URL has a sensible default.
-
-### Configuration
+**Environment variables** — only `FLOW_API_KEY` is required; the rest have sensible defaults:
 
 | Variable | Required | Default | Description |
 |----------|:--------:|---------|-------------|
@@ -94,6 +105,8 @@ Restart your client and say **"Show my flows"**.
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API server URL |
 | `FLOW_API_TIMEOUT` | | `30000` | Request timeout (ms) |
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket URL for real-time execution monitoring |
+
+</details>
 
 ## Examples
 
@@ -134,6 +147,29 @@ Restart your client and say **"Show my flows"**.
 
 "What's the preview node output?"
 → Port data (value, type, timestamp)
+```
+
+### Manage Credits
+
+```
+"Check my credit balance"
+→ Total / available / held credits
+
+"Show credit packs"
+→ Purchasable packs with USD prices
+
+"Top up 1,000 credits"
+→ Charges the card on file (enroll one at billing.eureka.codes if you haven't)
+
+"Show my credit history"
+→ Top-ups and usage, newest first
+```
+
+### Publish a Flow
+
+```
+"Publish flow 1004897"        → opens it to the public
+"Make flow 1004897 private"   → unpublishes it
 ```
 
 ## 28 Tools

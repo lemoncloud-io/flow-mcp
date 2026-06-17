@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { registerBlockTools, summarizeBlock } from '../../src/tools';
+import { FlowApiError } from '../../src/api-client';
 import { makeApiClient, makeBlock, makeBlockDef, makePortDef, makeListResult, type MockApiClient } from '../helpers/factories';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
@@ -156,5 +157,59 @@ describe('block_list handler', () => {
     const result = await handlers.block_list({ stereo: undefined });
 
     expect((result as { isError: boolean }).isError).toBe(true);
+  });
+});
+
+describe('block_get handler', () => {
+  let mockClient: MockApiClient;
+  let handlers: Record<string, ToolHandler>;
+
+  beforeEach(() => {
+    mockClient = makeApiClient();
+    handlers = captureHandlers(mockClient);
+  });
+
+  const parse = (result: unknown) => JSON.parse((result as { content: Array<{ text: string }> }).content[0].text);
+
+  it('should return the block directly when getBlock succeeds (by id)', async () => {
+    mockClient.getBlock.mockResolvedValue(makeBlock({ id: '0008', processType: 'input-text' }));
+
+    const result = await handlers.block_get({ blockId: '0008' });
+
+    expect(mockClient.getBlock).toHaveBeenCalledWith('0008');
+    expect(mockClient.listBlocks).not.toHaveBeenCalled();
+    expect(parse(result).type).toBe('input-text');
+  });
+
+  it('should fall back to the catalog when getBlock 404s, resolving by processType', async () => {
+    mockClient.getBlock
+      .mockRejectedValueOnce(new FlowApiError('not_found', 'Not found'))
+      .mockResolvedValueOnce(makeBlock({ id: '0008', processType: 'input-text' }));
+    mockClient.listBlocks.mockResolvedValue(makeListResult([makeBlock({ id: '0008', processType: 'input-text' })]));
+
+    const result = await handlers.block_get({ blockId: 'input-text' });
+
+    expect(mockClient.listBlocks).toHaveBeenCalled();
+    expect(mockClient.getBlock).toHaveBeenLastCalledWith('0008');
+    expect((result as { isError?: boolean }).isError).toBeUndefined();
+    expect(parse(result).type).toBe('input-text');
+  });
+
+  it('should return toolError when 404 and no catalog match', async () => {
+    mockClient.getBlock.mockRejectedValue(new FlowApiError('not_found', 'Not found'));
+    mockClient.listBlocks.mockResolvedValue(makeListResult([makeBlock({ id: 'x', processType: 'other' })]));
+
+    const result = await handlers.block_get({ blockId: 'nope' });
+
+    expect((result as { isError: boolean }).isError).toBe(true);
+  });
+
+  it('should not fall back on non-not_found errors', async () => {
+    mockClient.getBlock.mockRejectedValue(new FlowApiError('auth', 'bad key'));
+
+    const result = await handlers.block_get({ blockId: 'x' });
+
+    expect((result as { isError: boolean }).isError).toBe(true);
+    expect(mockClient.listBlocks).not.toHaveBeenCalled();
   });
 });

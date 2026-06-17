@@ -50,19 +50,33 @@ AI에게 이렇게 말하면 됩니다:
 
 ## 시작하기
 
-### 1단계: 설치
+> **준비물:** [**Claude Desktop**](https://claude.ai/download) 앱 설치, 그리고 무료 Eureka 계정(Google 로그인만 하면 됨 — 별도 가입 양식 없음).
+
+### 🚀 원클릭 설치 — Claude Desktop (추천, 터미널 불필요)
+
+1. **무료 API 키 발급.** **[flow.eureka.codes](https://flow.eureka.codes)** 접속 후 **Google로 로그인**. 바로 **Create Key**(키 생성) 페이지로 이동됩니다 — **Create Key** 클릭 후 **Copy**(복사). 키는 `ec-…` 형태입니다. **지금 바로 안전한 곳(메모 앱 등)에 붙여넣어 두세요** — 한 번만 표시되지만, 잃어버리면 새로 만들면 됩니다.
+2. **확장 파일 다운로드.** [**Releases 페이지**](https://github.com/lemoncloud-io/flow-mcp/releases/latest)에서 **Assets** 항목을 열고 **`flow-mcp.mcpb`** 를 다운로드. *("Source code" 파일들은 무시 — 필요 없습니다.)*
+3. **설치.** **`flow-mcp.mcpb`** 더블클릭 → Claude Desktop에 **설치 창**이 열림 → API 키 붙여넣기 → **Install** 클릭.
+   - *Mac이 "확인되지 않은 개발자" 경고?* 파일 우클릭 → **열기** → **열기**. 다운로드 파일에선 정상입니다.
+   - *설치 창이 안 뜨면?* Claude Desktop → **설정 → 확장(Extensions)** 에서 파일을 끌어다 놓으세요.
+4. **작동 확인.** Claude에게 *"내 flow 목록 보여줘"*. 뭐라도 답하면 — *"flow가 없습니다"* 라고 해도 — 연결 성공! 🎉 이어서 *"플로우 만들어줘"* 또는 *"내 크레딧 잔액 확인해줘"*.
+
+> 키 하나로 **플로우 + 크레딧(빌링)** 모두 사용 가능. 편집할 설정 파일도, 어려운 것도 없습니다.
+
+### 다른 클라이언트 (Cursor · Windsurf · VS Code · Claude Code)
+
+<details>
+<summary><b>수동 설치</b> (npm + 설정 파일)</summary>
+
+**1. 설치**
 
 ```bash
 npm install -g @lemoncloud/flow-mcp
 ```
 
-### 2단계: API 키 발급
+**2. API 키 발급** — [flow.eureka.codes](https://flow.eureka.codes) → Google 로그인 → **Create Key** → **Copy** (`ec-…`, 한 번만 표시)
 
-[Eureka Codes 콘솔](https://console.eureka.codes)에서 API 키를 발급받으세요.
-
-### 3단계: MCP 클라이언트 설정
-
-**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json` 파일에 추가:
+**3. 클라이언트 MCP 설정에 추가.** Claude Desktop 파일: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
@@ -71,22 +85,19 @@ npm install -g @lemoncloud/flow-mcp
       "command": "npx",
       "args": ["-y", "@lemoncloud/flow-mcp"],
       "env": {
-        "FLOW_API_KEY": "발급받은-API-키"
+        "FLOW_API_KEY": "ec-발급받은-키"
       }
     }
   }
 }
 ```
 
-**Cursor / Windsurf** — IDE의 MCP 설정에 동일한 `mcpServers` 내용을 추가하세요.
+- **Cursor / Windsurf / VS Code (Continue/Cline):** IDE의 MCP 설정에 동일한 `mcpServers` 블록 추가.
+- **Claude Code:** `claude mcp add flow-mcp -e FLOW_API_KEY=ec-발급받은-키 -- npx -y @lemoncloud/flow-mcp`
 
-### 4단계: 시작!
+**4. 재시작** 후 **"내 flow 목록 보여줘"** 라고 말해보세요.
 
-클라이언트를 재시작하고 **"내 flow 목록 보여줘"** 라고 말해보세요.
-
-> **참고:** `FLOW_API_KEY`만 있으면 바로 사용할 수 있습니다. API URL은 기본값이 설정되어 있습니다.
-
-### 설정 옵션
+**환경변수** — `FLOW_API_KEY`만 필수, 나머지는 기본값 있음:
 
 | 환경변수 | 필수 | 기본값 | 설명 |
 |---------|:---:|--------|------|
@@ -94,6 +105,8 @@ npm install -g @lemoncloud/flow-mcp
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API 서버 주소 |
 | `FLOW_API_TIMEOUT` | | `30000` | API 요청 타임아웃 (ms) |
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket 주소 (실시간 진행상황 모니터링) |
+
+</details>
 
 ## 사용 예시
 
@@ -134,6 +147,29 @@ npm install -g @lemoncloud/flow-mcp
 
 "미리보기 노드의 출력값은?"
 → 포트 데이터 (값, 타입, 타임스탬프)
+```
+
+### 크레딧 관리
+
+```
+"내 크레딧 잔액 확인해줘"
+→ 전체 / 사용 가능 / 보류 크레딧
+
+"크레딧 팩 보여줘"
+→ 구매 가능한 팩 + USD 가격
+
+"1,000 크레딧 충전해줘"
+→ 등록된 카드로 결제 (카드 없으면 billing.eureka.codes에서 등록)
+
+"내 크레딧 사용 내역 보여줘"
+→ 충전/사용 내역 (최신순)
+```
+
+### 플로우 공개
+
+```
+"1004897 플로우 공개해줘"        → public으로 전환
+"1004897 플로우 비공개로 바꿔"   → 비공개로 전환
 ```
 
 ## 28개 도구

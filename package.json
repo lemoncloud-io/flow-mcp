@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "bundle": "npm run build && node scripts/sync-manifest.mjs && npx -y @anthropic-ai/mcpb@latest pack . flow-mcp.mcpb",
     "start": "node dist/stdio.js",
     "dev": "tsc --watch",
     "lint": "eslint src/",

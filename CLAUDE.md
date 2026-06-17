@@ -46,12 +46,19 @@ src/
 
 ```bash
 npm run build    # TypeScript compilation
+npm run bundle   # Build + pack Claude Desktop extension (flow-mcp.mcpb)
 npm run lint     # ESLint
 npm run lint:type # Type check (tsc --noEmit)
 npm run dev      # Watch mode
 npm start        # Run MCP server (stdio)
 npm test         # Run tests
 ```
+
+## Distribution
+
+- **npm**: `@lemoncloud/flow-mcp` (ships `dist/` only) — for `npx`/manual MCP config.
+- **Desktop Extension**: `manifest.json` (MCPB spec v0.3) → `npm run bundle` packs `flow-mcp.mcpb` for one-click Claude Desktop install with a GUI API-key prompt (`user_config.api_key` → `FLOW_API_KEY`). CI (`release.yml`) prunes devDeps, syncs the manifest version (`scripts/sync-manifest.mjs`), and attaches the `.mcpb` to each GitHub release.
+- **Auth/onboarding**: one `ec-…` key authenticates flows + credits. Users get it at flow.eureka.codes → Google sign-in → Create Key → Copy (shown once).
 
 ## API Endpoints Called
 

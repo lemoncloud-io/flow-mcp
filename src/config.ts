@@ -35,9 +35,10 @@ export const getConfigOrThrow = (): FlowApiConfig => {
     const config = getConfig();
     if (!config) {
         throw new Error(
-            'Missing or invalid FLOW_API_KEY. This single x-api-key authenticates both flows and credits. ' +
-                'Get yours at https://flow.eureka.codes (Settings → API Key) or https://billing.eureka.codes, ' +
-                'then set FLOW_API_KEY in .env or your Claude Desktop / MCP client env config. ' +
+            'Missing or invalid FLOW_API_KEY. This single key authenticates both flows and credits. ' +
+                'Get one free: open https://flow.eureka.codes, sign in with Google, click "Create Key", then Copy ' +
+                '(it looks like "ec-..." and is shown only once). ' +
+                'Set it as FLOW_API_KEY in your Claude Desktop / MCP client config (or .env). ' +
                 'Check stderr for validation details.',
         );
     }
