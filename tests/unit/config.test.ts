@@ -122,7 +122,7 @@ describe('getConfigOrThrow', () => {
   it('should throw with descriptive message when config invalid', async () => {
     const { getConfigOrThrow } = await loadConfig();
 
-    expect(() => getConfigOrThrow()).toThrow(/FLOW_API_URL/);
     expect(() => getConfigOrThrow()).toThrow(/FLOW_API_KEY/);
+    expect(() => getConfigOrThrow()).toThrow(/eureka\.codes/);
   });
 });

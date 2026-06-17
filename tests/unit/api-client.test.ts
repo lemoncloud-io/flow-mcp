@@ -230,6 +230,61 @@ describe('FlowApiClient', () => {
     });
   });
 
+  describe('credit operations', () => {
+    it('should call GET /wallets/0/balance', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: { total: 1000 } });
+
+      const result = await client.getWalletBalance();
+
+      expect(axiosInstance.get).toHaveBeenCalledWith('/wallets/0/balance');
+      expect(result).toEqual({ total: 1000 });
+    });
+
+    it('should call absolute /public/products/0/list URL with limit', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makeListResult([]) });
+
+      await client.listProducts();
+
+      expect(axiosInstance.get).toHaveBeenCalledWith('https://api.example.com/public/products/0/list', {
+        params: { limit: 100 },
+      });
+    });
+
+    it('should POST /credits/0/purchase with productId and requestId', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'post').mockResolvedValue({ data: { id: 'tx-1' } });
+
+      await client.purchaseCredits('prod-1', 'req-1');
+
+      expect(axiosInstance.post).toHaveBeenCalledWith('/credits/0/purchase', {
+        productId: 'prod-1',
+        requestId: 'req-1',
+      });
+    });
+
+    it('should GET /transactions/0/list with no params by default', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makeListResult([]) });
+
+      await client.listTransactions();
+
+      expect(axiosInstance.get).toHaveBeenCalledWith('/transactions/0/list', { params: {} });
+    });
+
+    it('should include stereo/limit/page filters in /transactions/0/list', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makeListResult([]) });
+
+      await client.listTransactions({ stereo: 'use', limit: 10, page: 2 });
+
+      expect(axiosInstance.get).toHaveBeenCalledWith('/transactions/0/list', {
+        params: { limit: 10, page: 2, stereo: 'use' },
+      });
+    });
+  });
+
   describe('error normalization', () => {
     // Access private normalizeError via bracket notation
     const callNormalize = (client: FlowApiClient, axiosError: Record<string, unknown>): FlowApiError =>
@@ -277,6 +332,14 @@ describe('FlowApiClient', () => {
 
       expect(err.code).toBe('auth');
       expect(err.message).toContain('403');
+    });
+
+    it('should normalize 402 to payment error', () => {
+      const { client } = createClient();
+      const err = callNormalize(client, createAxiosError({ status: 402, data: { message: 'card missing' } }));
+
+      expect(err.code).toBe('payment');
+      expect(err.message).toContain('billing.eureka.codes');
     });
 
     it('should normalize 404 to not_found error', () => {

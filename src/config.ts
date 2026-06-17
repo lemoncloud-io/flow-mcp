@@ -35,8 +35,10 @@ export const getConfigOrThrow = (): FlowApiConfig => {
     const config = getConfig();
     if (!config) {
         throw new Error(
-            'Missing or invalid environment variables: FLOW_API_URL and FLOW_API_KEY. ' +
-                'Set them in .env or pass via Claude Desktop env config. Check stderr for details.',
+            'Missing or invalid FLOW_API_KEY. This single x-api-key authenticates both flows and credits. ' +
+                'Get yours at https://flow.eureka.codes (Settings → API Key) or https://billing.eureka.codes, ' +
+                'then set FLOW_API_KEY in .env or your Claude Desktop / MCP client env config. ' +
+                'Check stderr for validation details.',
         );
     }
     return config;

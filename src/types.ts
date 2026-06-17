@@ -195,4 +195,34 @@ export interface RunView {
     updatedAt?: number;
 }
 
+// --- Credit / billing types (flw credit gateway, x-api-key auth) ---
+
+export interface WalletView {
+    total?: number;
+    available?: number;
+    held?: number;
+}
+
+export interface ProductView {
+    id: string;
+    name?: string;
+    creditAmount?: number;
+    bonusAmount?: number;
+    totalCredit?: number; // creditAmount + bonusAmount
+    stripeAmount?: number; // price in cents (USD)
+    currency?: string;
+    expiresInDays?: number;
+}
+
+export interface TransactionView {
+    id: string;
+    stereo?: 'use' | 'purchase' | 'gain' | 'cancel';
+    name?: string;
+    reason?: string;
+    amount?: number;
+    creditChange?: number;
+    createdAt?: number;
+    expiresAt?: number;
+}
+
 export const TERMINAL_STATES = new Set(['COMPLETED', 'ERROR', 'SKIPPED']);

@@ -319,6 +319,31 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
     );
 
     server.registerTool(
+        'flow_publish',
+        {
+            title: 'Publish Flow',
+            description:
+                'Publish a flow publicly ("open as public") so anyone can view and run it, or unpublish it. ' +
+                'Toggles the isPublic flag without touching nodes or edges. ' +
+                'Pass isPublic=false to make the flow private again.',
+            inputSchema: z.object({
+                flowId,
+                isPublic: z.optional(z.boolean()).describe('true to publish (default), false to make private'),
+            }),
+            outputSchema: PassthroughSchema,
+        },
+        async ({ flowId, isPublic }) => {
+            try {
+                const makePublic = isPublic ?? true;
+                const result = await client.upsertFlow(flowId, { isPublic: makePublic });
+                return toolResult({ flowId, isPublic: makePublic, flow: result });
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.registerTool(
         'flow_save',
         {
             title: 'Save Flow',

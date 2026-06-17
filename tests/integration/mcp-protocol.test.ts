@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { registerFlowTools, registerNodeTools, registerBlockTools, registerRunTools } from '../../src/tools';
+import { registerFlowTools, registerNodeTools, registerBlockTools, registerRunTools, registerCreditTools } from '../../src/tools';
 import { makeConfig, makeFlow, makeBlock, makePortData, makeListResult, makeSaveFlow, makeNodeView, makeRun } from '../helpers/factories';
 import type { FlowApiClient } from '../../src/api-client';
 
@@ -18,6 +18,7 @@ const createTestServer = (mockClient: Record<string, ReturnType<typeof vi.fn>>) 
   registerNodeTools(server, mockClient as unknown as FlowApiClient, config);
   registerBlockTools(server, mockClient as unknown as FlowApiClient);
   registerRunTools(server, mockClient as unknown as FlowApiClient);
+  registerCreditTools(server, mockClient as unknown as FlowApiClient);
 
   return server;
 };
@@ -43,6 +44,10 @@ describe('MCP Protocol Integration', () => {
       getBlock: vi.fn().mockResolvedValue(makeBlock()),
       listRuns: vi.fn().mockResolvedValue(makeListResult([makeRun()])),
       getRun: vi.fn().mockResolvedValue(makeRun()),
+      getWalletBalance: vi.fn().mockResolvedValue({ total: 1000, available: 1000, held: 0 }),
+      listProducts: vi.fn().mockResolvedValue(makeListResult([{ id: 'prod-1', creditAmount: 1000, stripeAmount: 1000 }])),
+      purchaseCredits: vi.fn().mockResolvedValue({ id: 'tx-1', stereo: 'purchase' }),
+      listTransactions: vi.fn().mockResolvedValue(makeListResult([{ id: 'tx-1', stereo: 'purchase', creditChange: 1000 }])),
     };
 
     server = createTestServer(mockApi);
@@ -59,13 +64,17 @@ describe('MCP Protocol Integration', () => {
     await server.close();
   });
 
-  it('should list all 23 tools', async () => {
+  it('should list all 28 tools', async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
 
     expect(names).toEqual([
       'block_get',
       'block_list',
+      'credit_balance',
+      'credit_history',
+      'credit_packs',
+      'credit_purchase',
       'edge_create',
       'edge_delete',
       'flow_clone',
@@ -74,6 +83,7 @@ describe('MCP Protocol Integration', () => {
       'flow_graph',
       'flow_list',
       'flow_load',
+      'flow_publish',
       'flow_run',
       'flow_run_from',
       'flow_save',

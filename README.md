@@ -136,13 +136,13 @@ Restart your client and say **"Show my flows"**.
 → Port data (value, type, timestamp)
 ```
 
-## 23 Tools
+## 28 Tools
 
 Claude automatically selects the right tool based on your request.
 
 | Tool | What it does |
 |------|-------------|
-| `profile_get` | Check API key configuration status |
+| `profile_get` | Check API key + AI provider config status |
 | `block_list` | List available block types |
 | `block_get` | Get block details by ID or name |
 | `flow_list` | List your workflows (with pagination) |
@@ -150,6 +150,7 @@ Claude automatically selects the right tool based on your request.
 | `flow_graph` | Mermaid diagram visualization |
 | `flow_create` | Create new flow (nodes + edges at once) |
 | `flow_update` | Update flow name / description |
+| `flow_publish` | Open a flow as public (or make private) |
 | `flow_save` | Full rebuild (caution: reassigns node IDs) |
 | `flow_clone` | Duplicate a flow |
 | `flow_export` | Export flow as portable JSON |
@@ -165,6 +166,10 @@ Claude automatically selects the right tool based on your request.
 | `edge_delete` | Remove a connection |
 | `run_list` | List execution history with token usage |
 | `run_get` | Get execution run details |
+| `credit_balance` | Check credit balance (total / available / held) |
+| `credit_packs` | List purchasable credit packs + USD price |
+| `credit_purchase` | Buy credits with card on file (headless) |
+| `credit_history` | Review credit ledger (top-ups + spend) |
 
 ---
 
@@ -213,7 +218,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 23 tools)
+  -> server.ts (McpServer + 28 tools)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)

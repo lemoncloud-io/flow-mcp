@@ -15,11 +15,12 @@ src/
 ├── tools/
 │   ├── helpers.ts      # toolResult(), toolError(), mcpLog() response/logging helpers
 │   ├── schemas.ts      # Zod output schemas for structuredContent validation
-│   ├── completions.ts  # completable() auto-completion for flowId, blockType, stereo
-│   ├── flow-tools.ts   # 11 flow tools (profile/list/load/graph/create/update/save/run/clone/export/run_from)
+│   ├── completions.ts  # completable() auto-completion for flowId, blockType, stereo, productId
+│   ├── flow-tools.ts   # 12 flow tools (profile/list/load/graph/create/update/publish/save/run/clone/export/run_from)
 │   ├── node-tools.ts   # 8 tools (get/create/run/get_port/update/delete, edge_create/delete)
 │   ├── block-tools.ts  # 2 block tools (get/list with cache)
 │   ├── run-tools.ts    # 2 run tools (list/get execution history)
+│   ├── credit-tools.ts # 4 credit tools (balance/packs/purchase/history)
 │   └── index.ts        # barrel export
 ├── ws-client.ts        # WebSocket client for real-time execution monitoring + progress callbacks
 ├── server.ts           # McpServer setup + registerTool
@@ -64,6 +65,7 @@ npm test         # Run tests
 | flow_clone | `GET /flows/:id/load` + `POST /flows/0/save` (two-step) |
 | flow_export | `GET /flows/:id/load` (returns clean JSON) |
 | flow_update | `POST /flows/:id/upsert` (metadata only) |
+| flow_publish | `POST /flows/:id/upsert` with `{ isPublic }` (open as public / private) |
 | flow_save | `POST /flows/:id/save` (full replace — use with caution) |
 | flow_run | Start nodes with `POST /nodes/:id/run?propagate=1` + WebSocket |
 | flow_run_from | `POST /nodes/:id/run?propagate=1` from specific node + WebSocket |
@@ -79,6 +81,12 @@ npm test         # Run tests
 | block_list | `GET /blocks/0/list?cores=1` (cached 5min) |
 | run_list | `GET /runs` (execution history) |
 | run_get | `GET /runs/:id` (run details + token usage) |
+| credit_balance | `GET /wallets/0/balance` (current wallet) |
+| credit_packs | `GET /public/products/0/list?limit=100` (public, no key) |
+| credit_purchase | `POST /credits/0/purchase` with `{ productId, requestId }` (card on file) |
+| credit_history | `GET /transactions/0/list` (credit ledger) |
+
+> Credit endpoints share the same eureka-flows-api base + `x-api-key` (`/_api_` prefix); `products` is served from `/public`. Note: backend does NOT auto-deduct credits on flow/node run today — running is currently free server-side; `credit_history` reflects charges once the backend wires run billing.
 
 ## Conventions
 

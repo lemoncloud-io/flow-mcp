@@ -136,13 +136,13 @@ npm install -g @lemoncloud/flow-mcp
 → 포트 데이터 (값, 타입, 타임스탬프)
 ```
 
-## 23개 도구
+## 28개 도구
 
 자연어로 요청하면 Claude가 자동으로 적절한 도구를 선택합니다.
 
 | 도구 | 하는 일 |
 |------|--------|
-| `profile_get` | API 키 설정 상태 확인 |
+| `profile_get` | API 키 + AI 제공자 설정 상태 확인 |
 | `block_list` | 사용 가능한 블록 종류 조회 |
 | `block_get` | 블록 상세 조회 (ID 또는 이름) |
 | `flow_list` | 내 워크플로우 목록 (페이지네이션 지원) |
@@ -150,6 +150,7 @@ npm install -g @lemoncloud/flow-mcp
 | `flow_graph` | Mermaid 다이어그램 시각화 |
 | `flow_create` | 새 워크플로우 생성 (노드+엣지 한 번에) |
 | `flow_update` | 워크플로우 이름/설명 변경 |
+| `flow_publish` | 워크플로우 공개 전환 (또는 비공개로) |
 | `flow_save` | 전체 재구성 (주의: 기존 노드 ID 변경됨) |
 | `flow_clone` | 워크플로우 복제 |
 | `flow_export` | 워크플로우 JSON 내보내기 |
@@ -165,6 +166,10 @@ npm install -g @lemoncloud/flow-mcp
 | `edge_delete` | 연결 제거 |
 | `run_list` | 실행 이력 조회 (토큰 사용량 포함) |
 | `run_get` | 실행 상세 조회 |
+| `credit_balance` | 크레딧 잔액 확인 (총/가용/홀드) |
+| `credit_packs` | 구매 가능한 크레딧 팩 + USD 가격 조회 |
+| `credit_purchase` | 등록된 카드로 크레딧 충전 (브라우저 불필요) |
+| `credit_history` | 크레딧 내역 조회 (충전 + 사용) |
 
 ---
 
@@ -213,7 +218,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 23 tools)
+  -> server.ts (McpServer + 28 tools)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)

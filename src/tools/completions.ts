@@ -39,6 +39,25 @@ export const completableStereo = completable(z.string().describe('Block category
     ['input', 'process', 'output'].filter(s => s.startsWith(value)),
 );
 
+/** In-memory cache for product list completions (60s TTL) */
+let productCache: { list: Array<{ id: string; name?: string }>; at: number } | null = null;
+const PRODUCT_CACHE_TTL = 60_000;
+
+/** Completable productId — fetches credit packs for autocomplete */
+export const completableProductId = (client: FlowApiClient) =>
+    completable(z.string().describe('Credit pack/product ID. Get from credit_packs.'), async value => {
+        const now = Date.now();
+        if (!productCache || now - productCache.at > PRODUCT_CACHE_TTL) {
+            const result = await client.listProducts();
+            productCache = { list: result.list ?? [], at: now };
+        }
+        const lower = value.toLowerCase();
+        return productCache.list
+            .filter(p => p.id?.startsWith(value) || p.name?.toLowerCase().includes(lower))
+            .map(p => p.id)
+            .filter(Boolean);
+    });
+
 /** Reset flow cache (for testing) */
 export const resetFlowCache = () => {
     flowCache = null;

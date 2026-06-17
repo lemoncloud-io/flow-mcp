@@ -10,6 +10,9 @@ import type {
   NodeView,
   RunView,
   ListResult,
+  WalletView,
+  ProductView,
+  TransactionView,
 } from '../../src/types';
 import { type FlowApiConfig, DEFAULT_WS_URL } from '../../src/config';
 
@@ -114,6 +117,34 @@ export const makePortData = (overrides?: Partial<PortData>): PortData => ({
   ...overrides,
 });
 
+export const makeWallet = (overrides?: Partial<WalletView>): WalletView => ({
+  total: 1000,
+  available: 1000,
+  held: 0,
+  ...overrides,
+});
+
+export const makeProduct = (overrides?: Partial<ProductView>): ProductView => ({
+  id: 'prod-1',
+  name: 'Starter Pack',
+  creditAmount: 1000,
+  bonusAmount: 100,
+  totalCredit: 1100,
+  stripeAmount: 1000, // $10.00
+  currency: 'USD',
+  ...overrides,
+});
+
+export const makeTransaction = (overrides?: Partial<TransactionView>): TransactionView => ({
+  id: 'tx-1',
+  stereo: 'purchase',
+  reason: 'credit_purchase',
+  amount: 1000,
+  creditChange: 1000,
+  createdAt: 1700000000000,
+  ...overrides,
+});
+
 export const makeListResult = <T>(list: T[], total?: number): ListResult<T> => ({
   total: total ?? list.length,
   list,
@@ -134,6 +165,10 @@ export const makeApiClient = () => ({
   listBlocks: vi.fn(),
   listRuns: vi.fn(),
   getRun: vi.fn(),
+  getWalletBalance: vi.fn(),
+  listProducts: vi.fn(),
+  purchaseCredits: vi.fn(),
+  listTransactions: vi.fn(),
 });
 
 export type MockApiClient = ReturnType<typeof makeApiClient>;

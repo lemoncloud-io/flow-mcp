@@ -11,6 +11,9 @@ import type {
     BlockView,
     ProfileView,
     RunView,
+    WalletView,
+    ProductView,
+    TransactionView,
 } from './types';
 
 export class FlowApiClient {
@@ -164,6 +167,37 @@ export class FlowApiClient {
         return data;
     }
 
+    // --- Credit / billing operations (flw credit gateway, x-api-key) ---
+
+    async getWalletBalance(): Promise<WalletView> {
+        const { data } = await this.client.get('/wallets/0/balance');
+        return data;
+    }
+
+    async listProducts(): Promise<ListResult<ProductView>> {
+        // Public endpoint — bypasses the /_api_ key prefix.
+        const { data } = await this.client.get(`${this.baseUrl}/public/products/0/list`, { params: { limit: 100 } });
+        return data;
+    }
+
+    async purchaseCredits(productId: string, requestId: string): Promise<Record<string, unknown>> {
+        const { data } = await this.client.post('/credits/0/purchase', { productId, requestId });
+        return data;
+    }
+
+    async listTransactions(opts?: {
+        stereo?: string;
+        limit?: number;
+        page?: number;
+    }): Promise<ListResult<TransactionView>> {
+        const params: Record<string, string | number> = {};
+        if (opts?.stereo) params.stereo = opts.stereo;
+        if (opts?.limit !== undefined) params.limit = opts.limit;
+        if (opts?.page !== undefined) params.page = opts.page;
+        const { data } = await this.client.get('/transactions/0/list', { params });
+        return data;
+    }
+
     // --- Error helpers ---
 
     private normalizeError(error: AxiosError): FlowApiError {
@@ -182,6 +216,13 @@ export class FlowApiClient {
         if (status === 401 || status === 403) {
             return new FlowApiError('auth', `Authentication failed (${status}): ${message}. Check your FLOW_API_KEY.`);
         }
+        if (status === 402) {
+            return new FlowApiError(
+                'payment',
+                `Payment required (402): ${message}. No card on file — enroll a payment method at ` +
+                    `https://billing.eureka.codes before purchasing credits.`,
+            );
+        }
         if (status === 404) {
             return new FlowApiError('not_found', `Not found: ${message}`);
         }
@@ -196,7 +237,7 @@ const resolveApiPath = (apiKey: string): string => {
     return '/_apis';
 };
 
-export type FlowApiErrorCode = 'auth' | 'not_found' | 'timeout' | 'api';
+export type FlowApiErrorCode = 'auth' | 'payment' | 'not_found' | 'timeout' | 'api';
 
 export class FlowApiError extends Error {
     constructor(
