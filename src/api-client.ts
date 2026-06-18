@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { logger } from './logger';
+import { CredentialStore } from './auth/credentials';
 import type { FlowApiConfig } from './config';
 import type {
     ListResult,
@@ -20,25 +21,39 @@ export class FlowApiClient {
     private client: AxiosInstance;
     private baseUrl: string;
     private timeout: number;
+    private credentials: CredentialStore;
     private blockCache: { data: ListResult<BlockView>; at: number } | null = null;
     private readonly BLOCK_CACHE_TTL = 5 * 60 * 1000; // 5 min
 
-    constructor(config: FlowApiConfig) {
+    constructor(config: FlowApiConfig, credentials?: CredentialStore) {
         this.baseUrl = config.FLOW_API_URL.replace(/\/+$/, '');
         // Backend serves the API only under /_api_ (the legacy /_apis route was removed 2026-04-30).
         const apiPath = '/_api_';
         this.timeout = config.FLOW_API_TIMEOUT;
+        this.credentials = credentials ?? new CredentialStore(config.FLOW_API_KEY);
 
         this.client = axios.create({
             baseURL: `${this.baseUrl}${apiPath}`,
             timeout: this.timeout,
-            headers: {
-                'x-api-key': config.FLOW_API_KEY,
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
         });
 
         logger.info(`API base: ${this.baseUrl}${apiPath}`);
+
+        // Inject the x-api-key per request so a key minted mid-session (via the auth tool) is used
+        // immediately, without restarting the server. No key yet → fail fast with auth_required.
+        this.client.interceptors.request.use(requestConfig => {
+            const apiKey = this.credentials.getApiKey();
+            if (!apiKey) {
+                throw new FlowApiError(
+                    'auth_required',
+                    'Not authenticated. Ask the assistant to log in (the auth tool opens a browser for Google sign-in), ' +
+                        'or set FLOW_API_KEY.',
+                );
+            }
+            requestConfig.headers.set('x-api-key', apiKey);
+            return requestConfig;
+        });
 
         this.client.interceptors.response.use(
             response => response,
@@ -48,6 +63,11 @@ export class FlowApiClient {
                 return Promise.reject(normalized);
             },
         );
+    }
+
+    /** Resolved API key (env or browser-login), or null if not yet authenticated. */
+    getApiKey(): string | null {
+        return this.credentials.getApiKey();
     }
 
     // --- Flow operations ---
@@ -237,7 +257,7 @@ export class FlowApiClient {
     }
 }
 
-export type FlowApiErrorCode = 'auth' | 'payment' | 'not_found' | 'timeout' | 'api';
+export type FlowApiErrorCode = 'auth' | 'auth_required' | 'payment' | 'not_found' | 'timeout' | 'api';
 
 export class FlowApiError extends Error {
     constructor(

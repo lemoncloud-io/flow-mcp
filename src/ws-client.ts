@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import { logger } from './logger';
 import type { FlowApiConfig } from './config';
+import { FlowApiError } from './api-client';
 import type { FlowApiClient } from './api-client';
 import { TERMINAL_STATES } from './types';
 
@@ -143,7 +144,14 @@ export const executeWithWs = (
             }
         };
 
-        const url = `${wsUrl}?x-api-key=${encodeURIComponent(apiConfig.FLOW_API_KEY)}&info=&channels=0000`;
+        const apiKey = client.getApiKey();
+        if (!apiKey) {
+            throw new FlowApiError(
+                'auth_required',
+                'Not authenticated — log in via the auth tool or set FLOW_API_KEY.',
+            );
+        }
+        const url = `${wsUrl}?x-api-key=${encodeURIComponent(apiKey)}&info=&channels=0000`;
         const ws = new WebSocket(url);
 
         ws.on('error', err => {

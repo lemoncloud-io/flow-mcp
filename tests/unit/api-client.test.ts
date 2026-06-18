@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FlowApiClient, FlowApiError } from '../../src/api-client';
+import { CredentialStore } from '../../src/auth/credentials';
 import { makeConfig, makeFlow, makeSaveFlow, makeNodeView, makePortData, makeBlock, makeListResult } from '../helpers/factories';
 
 // Spy on axios methods via the internal client instance
@@ -31,10 +32,33 @@ describe('FlowApiClient', () => {
       expect(axiosInstance.defaults.baseURL).toContain('/_api_');
     });
 
-    it('should set x-api-key header', () => {
+    it('should inject x-api-key via the request interceptor', () => {
       const { axiosInstance } = createClient({ FLOW_API_KEY: 'my-secret-key' });
+      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
+      const set = vi.fn();
 
-      expect(axiosInstance.defaults.headers['x-api-key']).toBe('my-secret-key');
+      interceptor({ headers: { set } });
+
+      expect(set).toHaveBeenCalledWith('x-api-key', 'my-secret-key');
+    });
+
+    it('should throw auth_required when no key is available', () => {
+      const client = new FlowApiClient(makeConfig(), { getApiKey: () => null } as unknown as CredentialStore);
+      const axiosInstance = (
+        client as unknown as {
+          client: { interceptors: { request: { handlers: Array<{ fulfilled: (c: unknown) => unknown }> } } };
+        }
+      ).client;
+      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
+
+      let thrown: unknown;
+      try {
+        interceptor({ headers: { set: vi.fn() } });
+      } catch (e) {
+        thrown = e;
+      }
+      expect(thrown).toBeInstanceOf(FlowApiError);
+      expect((thrown as FlowApiError).code).toBe('auth_required');
     });
   });
 

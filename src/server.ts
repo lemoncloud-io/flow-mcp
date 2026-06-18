@@ -2,13 +2,15 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { getConfigOrThrow } from './config';
 import { FlowApiClient } from './api-client';
+import { CredentialStore } from './auth/credentials';
 import { registerDispatchTools } from './tools';
 
 const { version: VERSION } = require('../package.json');
 
 export const createServer = (): { run: () => Promise<void> } => {
     const config = getConfigOrThrow();
-    const client = new FlowApiClient(config);
+    const credentials = new CredentialStore(config.FLOW_API_KEY);
+    const client = new FlowApiClient(config, credentials);
 
     const server = new McpServer(
         { name: 'flow-mcp', version: VERSION },
