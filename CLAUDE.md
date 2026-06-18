@@ -21,8 +21,15 @@ src/
 │   ├── block-tools.ts  # 2 block tools (get/list with cache)
 │   ├── run-tools.ts    # 2 run tools (list/get execution history)
 │   ├── credit-tools.ts # 4 credit tools (balance/packs/purchase/history)
-│   ├── dispatch.ts     # registers the public surface: flow_read/flow_do/credit_read/credit_do (route action→captured handler)
+│   ├── auth-tools.ts   # 3 auth tools (login/status/logout) — browser sign-in
+│   ├── dispatch.ts     # registers the public surface: flow_read/flow_do/credit_read/credit_do/auth (route action→captured handler)
 │   └── index.ts        # barrel export
+├── auth/
+│   ├── credentials.ts  # CredentialStore: env→~/.eureka/flow-mcp.json key resolution (0600)
+│   ├── endpoints.ts    # OAuth endpoint resolution (prod defaults, env-overridable)
+│   ├── web-core.ts     # Node @lemoncloud/lemon-web-core factory + in-memory storage
+│   ├── login.ts        # browser loopback OAuth → mint ec- key
+│   └── open-browser.ts # detached open/start/xdg-open
 ├── ws-client.ts        # WebSocket client for real-time execution monitoring + progress callbacks
 ├── server.ts           # McpServer setup + registerTool
 ├── stdio.ts            # Entry point: --help flag + 2-layer console suppression + JSON-RPC filter
@@ -31,7 +38,8 @@ src/
 
 ## Key Patterns
 
-- **4-tool public surface**: `server.ts` registers only `flow_read` (11 read actions), `flow_do` (13 write/run actions), `credit_read` (3 read actions), and `credit_do` (1 purchase action) via `registerDispatchTools` — split by **domain × access** so users approve 4 tools, not 28, and the read tools carry `readOnlyHint`. The 28 granular `registerXTools` still define the real handlers + Zod schemas; `dispatch.ts` registers them against a fake server to **capture** their `{meta, handler}`, then routes `{action, params}` → the captured handler (params re-validated against the original schema; logging delegated to the real server). `FLOW_READ_ACTIONS`/`FLOW_DO_ACTIONS`/`CREDIT_READ_ACTIONS`/`CREDIT_DO_ACTIONS` must stay in sync with the granular tools and be pairwise disjoint — `dispatch.test.ts` enforces this. (Only the `*_read` tools are `readOnlyHint`; the `*_do` tools mutate/charge.)
+- **5-tool public surface**: `server.ts` registers `flow_read` (11 read), `flow_do` (13 write/run), `credit_read` (3 read), `credit_do` (1 purchase), and `auth` (3: login/status/logout) via `registerDispatchTools` — split by **domain × access** so users approve 5 tools, not 31, and the read tools carry `readOnlyHint`. The granular `registerXTools` still define the real handlers + Zod schemas; `dispatch.ts` registers them against a fake server to **capture** their `{meta, handler}`, then routes `{action, params}` → the captured handler (params re-validated against the original schema; logging delegated to the real server). `FLOW_READ_ACTIONS`/`FLOW_DO_ACTIONS`/`CREDIT_READ_ACTIONS`/`CREDIT_DO_ACTIONS`/`AUTH_ACTIONS` must stay in sync with the granular tools and be pairwise disjoint — `dispatch.test.ts` enforces this. (Only the `*_read` tools are `readOnlyHint`.)
+- **Keyless start + browser login**: `FLOW_API_KEY` is optional (blank/empty coerced to unset). The server boots without a key; `FlowApiClient` injects the key per-request from `CredentialStore` (env wins, else `~/.eureka/flow-mcp.json`) and throws `FlowApiError('auth_required')` when absent. The `auth` tool's `login` action (`src/auth/login.ts`) opens a browser (loopback 127.0.0.1 OAuth), exchanges the code via `@lemoncloud/lemon-web-core`, mints an `ec-` key through `POST /_keys/0`, and persists it (0600). Endpoints in `src/auth/endpoints.ts` (prod defaults, env-overridable).
 - **MCP SDK v1.29** with v2 API (`McpServer` + `registerTool`)
 - **Zod v4** for input schemas (`import * as z from 'zod/v4'`)
 - **Error handling**: tool handlers return `{ isError: true, content: [...], structuredContent: { error, code? } }`, never throw

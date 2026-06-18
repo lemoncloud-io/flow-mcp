@@ -47,11 +47,15 @@ describe('getConfig', () => {
     expect(getConfig()).toBeNull();
   });
 
-  it('should return null when FLOW_API_KEY is missing', async () => {
+  it('should allow a blank/missing FLOW_API_KEY (keyless start; the auth tool mints one)', async () => {
     vi.stubEnv('FLOW_API_URL', 'https://api.example.com');
+    // An unfilled .mcpb config slot injects an empty string — it must count as unset, not invalid.
+    vi.stubEnv('FLOW_API_KEY', '');
     const { getConfig } = await loadConfig();
 
-    expect(getConfig()).toBeNull();
+    const config = getConfig();
+    expect(config).not.toBeNull();
+    expect(config?.FLOW_API_KEY).toBeUndefined();
   });
 
   it('should coerce FLOW_API_TIMEOUT string to number', async () => {

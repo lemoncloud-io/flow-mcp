@@ -54,15 +54,15 @@ No code required. No tool names to remember. Just ask in natural language.
 
 ### 🚀 One-Click Install — Claude Desktop (recommended, no terminal)
 
-1. **Get your free API key.** Open **[flow.eureka.codes](https://flow.eureka.codes)** and **sign in with Google**. You're taken straight to a **Create Key** page — click **Create Key**, then **Copy**. The key looks like `ec-…`. **Paste it somewhere safe right now** (a notes app) — it's shown only once, but if you lose it you can just make a new one.
-2. **Download the extension.** On the [**Releases page**](https://github.com/lemoncloud-io/flow-mcp/releases/latest), open the **Assets** section and download **`flow-mcp.mcpb`**. *(Ignore the "Source code" files — you don't need those.)*
-3. **Install it.** Double-click **`flow-mcp.mcpb`**. Claude Desktop opens an **install window** — paste your API key, then click **Install**.
+1. **Download the extension.** On the [**Releases page**](https://github.com/lemoncloud-io/flow-mcp/releases/latest), open the **Assets** section and download **`flow-mcp.mcpb`**. *(Ignore the "Source code" files — you don't need those.)*
+2. **Install it.** Double-click **`flow-mcp.mcpb`**. Claude Desktop opens an **install window** — **leave the API Key field blank** (you'll log in from chat in the next step) and click **Install**.
    - *Mac says "unidentified developer"?* Right-click the file → **Open** → **Open**. That's normal for downloads.
    - *No install window appeared?* Open Claude Desktop → **Settings → Extensions** and drag the file in.
+3. **Log in — no key to copy.** In Claude, just say **"Log in to Eureka."** A browser window opens for **Google sign-in** — finish there, and Claude provisions and stores your API key automatically. *(Prefer to paste a key yourself? Get one at [flow.eureka.codes](https://flow.eureka.codes) → sign in → Create Key → Copy, and put it in the API Key field at step 2 instead.)*
 4. **Check it works.** Ask Claude *"Show my flows"*. If it answers at all — even *"you have no flows yet"* — you're connected! 🎉 Then try *"Create a flow"* or *"Check my credit balance"*.
-   - *See a red error or "server disconnected" instead?* Open **Settings → Extensions**, confirm flow-mcp is enabled, and re-paste your API key.
+   - *See a red error or "server disconnected" instead?* Open **Settings → Extensions** and confirm flow-mcp is enabled, then ask Claude to *"log in"* again.
 
-> One key unlocks everything — **flows** and **billing credits**. Nothing technical to edit.
+> One login unlocks everything — **flows** and **billing credits**. No key to copy, nothing technical to edit.
 
 ### Other clients (Cursor · Windsurf · VS Code · Claude Code)
 
@@ -175,9 +175,9 @@ npm install -g @lemoncloud/flow-mcp
 "Make flow 1004897 private"   → unpublishes it
 ```
 
-## 4 Tools, 28 Actions
+## 5 Tools, 31 Actions
 
-flow-mcp exposes just **four** tools — so you approve permissions a handful of times, not 28. They split by domain (flow / credit) and by access (**read** vs **do**), so the read tools are marked read-only and the "do" tools are where the ⚠️ writes and charges live. You never call them by name; just talk to Claude ("publish my flow", "check my credits") and it picks the right action.
+flow-mcp exposes just **five** tools — so you approve permissions a handful of times, not 31. They split by domain (flow / credit) and by access (**read** vs **do**), plus an **auth** tool for sign-in. The read tools are marked read-only; the "do" tools are where the ⚠️ writes and charges live. You never call them by name; just talk to Claude ("log in", "publish my flow", "check my credits") and it picks the right action.
 
 ### `flow_read` — read flows (read-only)
 
@@ -199,7 +199,12 @@ flow-mcp exposes just **four** tools — so you approve permissions a handful of
 `{ action, params }` · Actions:
 `credit_purchase`
 
-> Click **"Always allow"** once for each tool you use and you're set — no more prompts. The two read tools are read-only and safe to allow; the `*_do` tools are the only ones that change anything or charge your card.
+### `auth` — sign in / out
+
+`{ action, params }` · Actions:
+`login` · `status` · `logout`
+
+> `login` opens a browser for Google sign-in and provisions + stores your API key — no copy-paste. Click **"Always allow"** once for each tool you use and you're set. The two read tools are read-only and safe to allow; the `*_do` tools are the only ones that change anything or charge your card.
 
 ---
 
@@ -248,7 +253,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 4 dispatch tools -> 28 actions)
+  -> server.ts (McpServer + 5 dispatch tools -> 31 actions)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)

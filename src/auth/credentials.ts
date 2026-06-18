@@ -1,10 +1,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { logger } from '../logger';
 
-const CRED_DIR = join(homedir(), '.eureka');
-const CRED_FILE = join(CRED_DIR, 'flow-mcp.json');
+const DEFAULT_CRED_FILE = join(homedir(), '.eureka', 'flow-mcp.json');
+
+export interface CredentialStoreOptions {
+    /** Override the on-disk credentials path (tests). Defaults to ~/.eureka/flow-mcp.json. */
+    filePath?: string;
+}
 
 interface StoredCredentials {
     apiKey: string;
@@ -31,7 +35,14 @@ const maskKey = (key: string): string => (key.length <= 8 ? `${key.slice(0, 3)}â
  * getApiKey() so a login performed mid-session is picked up without restarting the server.
  */
 export class CredentialStore {
-    constructor(private readonly envKey?: string) {}
+    private readonly file: string;
+
+    constructor(
+        private readonly envKey?: string,
+        options?: CredentialStoreOptions,
+    ) {
+        this.file = options?.filePath ?? DEFAULT_CRED_FILE;
+    }
 
     /** Current API key, or null if neither env nor a stored login is present. */
     getApiKey(): string | null {
@@ -41,15 +52,15 @@ export class CredentialStore {
 
     /** Persist a freshly minted key with owner-only permissions. */
     save(apiKey: string, meta?: { uid?: string; sid?: string }): void {
-        mkdirSync(CRED_DIR, { recursive: true, mode: 0o700 });
+        mkdirSync(dirname(this.file), { recursive: true, mode: 0o700 });
         const data: StoredCredentials = { apiKey, savedAt: new Date().toISOString(), ...meta };
-        writeFileSync(CRED_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
-        logger.info(`Saved Eureka credentials to ${CRED_FILE}`);
+        writeFileSync(this.file, JSON.stringify(data, null, 2), { mode: 0o600 });
+        logger.info(`Saved Eureka credentials to ${this.file}`);
     }
 
     /** Remove any stored login (does not affect an env-provided key). */
     clear(): void {
-        if (existsSync(CRED_FILE)) rmSync(CRED_FILE);
+        if (existsSync(this.file)) rmSync(this.file);
     }
 
     /** Auth status for the `auth status` action. */
@@ -70,8 +81,8 @@ export class CredentialStore {
 
     private readStored(): StoredCredentials | null {
         try {
-            if (!existsSync(CRED_FILE)) return null;
-            return JSON.parse(readFileSync(CRED_FILE, 'utf8')) as StoredCredentials;
+            if (!existsSync(this.file)) return null;
+            return JSON.parse(readFileSync(this.file, 'utf8')) as StoredCredentials;
         } catch (e) {
             logger.error(`Failed to read stored credentials: ${(e as Error).message}`);
             return null;

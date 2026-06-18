@@ -54,15 +54,15 @@ AI에게 이렇게 말하면 됩니다:
 
 ### 🚀 원클릭 설치 — Claude Desktop (추천, 터미널 불필요)
 
-1. **무료 API 키 발급.** **[flow.eureka.codes](https://flow.eureka.codes)** 접속 후 **Google로 로그인**. 바로 **Create Key**(키 생성) 페이지로 이동됩니다 — **Create Key** 클릭 후 **Copy**(복사). 키는 `ec-…` 형태입니다. **지금 바로 안전한 곳(메모 앱 등)에 붙여넣어 두세요** — 한 번만 표시되지만, 잃어버리면 새로 만들면 됩니다.
-2. **확장 파일 다운로드.** [**Releases 페이지**](https://github.com/lemoncloud-io/flow-mcp/releases/latest)에서 **Assets** 항목을 열고 **`flow-mcp.mcpb`** 를 다운로드. *("Source code" 파일들은 무시 — 필요 없습니다.)*
-3. **설치.** **`flow-mcp.mcpb`** 더블클릭 → Claude Desktop에 **설치 창**이 열림 → API 키 붙여넣기 → **Install** 클릭.
+1. **확장 파일 다운로드.** [**Releases 페이지**](https://github.com/lemoncloud-io/flow-mcp/releases/latest)에서 **Assets** 항목을 열고 **`flow-mcp.mcpb`** 를 다운로드. *("Source code" 파일들은 무시 — 필요 없습니다.)*
+2. **설치.** **`flow-mcp.mcpb`** 더블클릭 → Claude Desktop에 **설치 창**이 열림 → **API 키 칸은 비워두고**(다음 단계에서 챗으로 로그인) **Install** 클릭.
    - *Mac이 "확인되지 않은 개발자" 경고?* 파일 우클릭 → **열기** → **열기**. 다운로드 파일에선 정상입니다.
    - *설치 창이 안 뜨면?* Claude Desktop → **설정 → 확장(Extensions)** 에서 파일을 끌어다 놓으세요.
+3. **로그인 — 복붙할 키 없음.** Claude에게 그냥 **"Eureka 로그인해줘"**. **구글 로그인** 브라우저 창이 열립니다 — 거기서 로그인만 끝내면 Claude가 API 키를 자동 발급·저장합니다. *(직접 키를 넣고 싶으면? [flow.eureka.codes](https://flow.eureka.codes) → 로그인 → Create Key → Copy 한 뒤 2단계의 API 키 칸에 붙여넣으세요.)*
 4. **작동 확인.** Claude에게 *"내 flow 목록 보여줘"*. 뭐라도 답하면 — *"flow가 없습니다"* 라고 해도 — 연결 성공! 🎉 이어서 *"플로우 만들어줘"* 또는 *"내 크레딧 잔액 확인해줘"*.
-   - *빨간 오류나 "server disconnected"가 보이면?* **설정 → 확장(Extensions)** 에서 flow-mcp가 켜져 있는지 확인하고 API 키를 다시 붙여넣으세요.
+   - *빨간 오류나 "server disconnected"가 보이면?* **설정 → 확장(Extensions)** 에서 flow-mcp가 켜져 있는지 확인하고, Claude에게 다시 *"로그인해줘"* 하세요.
 
-> 키 하나로 **플로우 + 크레딧(빌링)** 모두 사용 가능. 편집할 설정 파일도, 어려운 것도 없습니다.
+> 로그인 한 번이면 **플로우 + 크레딧(빌링)** 모두 사용 가능. 복붙할 키도, 편집할 설정 파일도 없습니다.
 
 ### 다른 클라이언트 (Cursor · Windsurf · VS Code · Claude Code)
 
@@ -175,9 +175,9 @@ npm install -g @lemoncloud/flow-mcp
 "1004897 플로우 비공개로 바꿔"   → 비공개로 전환
 ```
 
-## 4개 도구, 28개 액션
+## 5개 도구, 31개 액션
 
-flow-mcp는 도구가 **4개**뿐 — 권한 승인을 28번이 아니라 몇 번만 하면 됩니다. 도메인(flow / credit) × 접근(**read** 읽기 / **do** 쓰기)으로 나뉘어, 읽기 도구는 read-only로 표시되고 ⚠️ 변경·결제는 `*_do` 도구에만 모여 있습니다. 이름으로 직접 부를 일 없이, 그냥 Claude에게 말하면("플로우 공개해줘", "크레딧 확인") 알맞은 액션을 자동 선택합니다.
+flow-mcp는 도구가 **5개**뿐 — 권한 승인을 31번이 아니라 몇 번만 하면 됩니다. 도메인(flow / credit) × 접근(**read** 읽기 / **do** 쓰기)으로 나뉘고, 로그인용 **auth** 도구가 있습니다. 읽기 도구는 read-only로 표시되고 ⚠️ 변경·결제는 `*_do` 도구에만 모여 있습니다. 이름으로 직접 부를 일 없이, 그냥 Claude에게 말하면("로그인", "플로우 공개해줘", "크레딧 확인") 알맞은 액션을 자동 선택합니다.
 
 ### `flow_read` — 플로우 읽기 (read-only)
 
@@ -199,7 +199,12 @@ flow-mcp는 도구가 **4개**뿐 — 권한 승인을 28번이 아니라 몇 �
 `{ action, params }` · 액션:
 `credit_purchase`
 
-> 사용하는 도구마다 **"Always allow" 한 번**씩이면 끝 — 더 이상 프롬프트 없음. 읽기 도구 2개는 read-only라 안심하고 허용 가능, 무언가를 바꾸거나 카드를 결제하는 건 `*_do` 도구뿐입니다.
+### `auth` — 로그인 / 로그아웃
+
+`{ action, params }` · 액션:
+`login` · `status` · `logout`
+
+> `login`은 구글 로그인 브라우저를 열어 API 키를 자동 발급·저장합니다 — 복붙 없음. 사용하는 도구마다 **"Always allow" 한 번**씩이면 끝. 읽기 도구 2개는 read-only라 안심하고 허용 가능, 무언가를 바꾸거나 카드를 결제하는 건 `*_do` 도구뿐입니다.
 
 ---
 
@@ -248,7 +253,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 4 dispatch tools -> 28 actions)
+  -> server.ts (McpServer + 5 dispatch tools -> 31 actions)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)
