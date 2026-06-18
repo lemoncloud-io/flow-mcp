@@ -5,7 +5,7 @@ import { createNodeWebCore, type WebCore } from './web-core';
 import { resolveAuthEndpoints } from './endpoints';
 import type { FlowApiConfig } from '../config';
 
-const LOGIN_TIMEOUT = 120_000;
+const LOGIN_TIMEOUT = 300_000;
 
 export interface LoginResult {
     apiKey: string;
@@ -29,6 +29,13 @@ const PAGE = (title: string, body: string): string =>
 
 const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
+/** Extract a concise HTTP status + body from an axios-style error for actionable messages. */
+const httpDetail = (e: unknown): string => {
+    const err = e as { response?: { status?: number; data?: unknown }; message?: string };
+    if (err?.response) return `HTTP ${err.response.status} ${JSON.stringify(err.response.data ?? '').slice(0, 200)}`;
+    return err?.message ?? String(e);
+};
+
 const buildAuthorizeUrl = (socialOAuthUrl: string, redirectUri: string): string => {
     const state = encodeURIComponent(JSON.stringify({ from: 'flow-mcp' }));
     return `${socialOAuthUrl}/oauth/google/authorize?redirect=${encodeURIComponent(redirectUri)}&state=${state}`;
@@ -43,7 +50,7 @@ const startCallbackServer = (): Promise<{ server: http.Server; port: number; cod
             resolveCode = res;
             rejectCode = rej;
         });
-        const timer = setTimeout(() => rejectCode(new Error('Login timed out after 2 minutes.')), LOGIN_TIMEOUT);
+        const timer = setTimeout(() => rejectCode(new Error('Login timed out after 5 minutes.')), LOGIN_TIMEOUT);
 
         const server = http.createServer((req, res) => {
             const url = new URL(req.url ?? '', 'http://127.0.0.1');
@@ -76,11 +83,18 @@ const startCallbackServer = (): Promise<{ server: http.Server; port: number; cod
 
 /** Exchange the authorization code for AWS credentials stored inside the webCore instance. */
 const exchangeCodeForCreds = async (webCore: WebCore, oAuthEndpoint: string, code: string): Promise<void> => {
-    const { data } = await webCore
-        .buildSignedRequest({ method: 'POST', baseURL: `${oAuthEndpoint}/oauth/google/token` })
-        .setBody({ code })
-        .execute<{ Token: unknown }>();
-    await webCore.buildCredentialsByToken((data as { Token: unknown }).Token as never);
+    try {
+        const { data } = await webCore
+            .buildSignedRequest({ method: 'POST', baseURL: `${oAuthEndpoint}/oauth/google/token` })
+            .setBody({ code })
+            .execute<{ Token: unknown }>();
+        await webCore.buildCredentialsByToken((data as { Token: unknown }).Token as never);
+        // The /_keys endpoint requires the x-lemon-identity header (identity token) in addition to the
+        // SigV4 signature — enable it so the key-creation request is authorized.
+        await webCore.setUseXLemonIdentity(true);
+    } catch (e) {
+        throw new Error(`OAuth token exchange failed — ${httpDetail(e)}`, { cause: e });
+    }
 };
 
 /** Reuse an existing valid ec- key, else mint a fresh one (SigV4-signed via webCore). */
@@ -96,13 +110,17 @@ const mintApiKey = async (webCore: WebCore, openApiEndpoint: string): Promise<st
         // Listing failed — fall through and create a new key.
     }
 
-    const { data: created } = await webCore
-        .buildSignedRequest({ method: 'POST', baseURL: `${openApiEndpoint}/_keys/0` })
-        .setParams({ mocks: false })
-        .setBody({ name: 'flow-mcp' })
-        .execute<KeyView>();
-    if (!created.apiKey) throw new Error('Key creation returned no apiKey.');
-    return created.apiKey;
+    try {
+        const { data: created } = await webCore
+            .buildSignedRequest({ method: 'POST', baseURL: `${openApiEndpoint}/_keys/0` })
+            .setParams({ mocks: false })
+            .setBody({ name: 'flow-mcp' })
+            .execute<KeyView>();
+        if (!created.apiKey) throw new Error('Key creation returned no apiKey.');
+        return created.apiKey;
+    } catch (e) {
+        throw new Error(`API key creation failed — ${httpDetail(e)}`, { cause: e });
+    }
 };
 
 /** Poll the flows API until the new key is active (it propagates a few seconds after creation). */
@@ -131,7 +149,7 @@ export const runBrowserLogin = async (config: FlowApiConfig, onProgress?: Progre
         const redirectUri = `http://127.0.0.1:${port}/cb`;
         onProgress?.('Opening your browser for Google sign-in…');
         await openBrowser(buildAuthorizeUrl(ep.socialOAuthUrl, redirectUri));
-        onProgress?.('Waiting for sign-in to finish (up to 2 minutes)…');
+        onProgress?.('Waiting for sign-in to finish (up to 5 minutes)…');
 
         const authCode = await code;
         onProgress?.('Signed in. Provisioning your API key…');
