@@ -65,3 +65,26 @@ export const RunListOutputSchema = z.object({
     offset: z.optional(z.number()),
     runs: z.array(PassthroughSchema),
 });
+
+// --- Credit Balance ---
+export const CreditBalanceOutputSchema = z
+    .object({
+        total: z.number(),
+        available: z.optional(z.number()),
+        held: z.optional(z.number()),
+    })
+    .passthrough();
+
+// --- Credit Packs ---
+export const CreditPacksOutputSchema = z.object({
+    total: z.number(),
+    packs: z.array(PassthroughSchema),
+});
+
+// --- Credit History ---
+export const CreditHistoryOutputSchema = z.object({
+    total: z.number(),
+    page: z.optional(z.number()),
+    limit: z.optional(z.number()),
+    transactions: z.array(PassthroughSchema),
+});

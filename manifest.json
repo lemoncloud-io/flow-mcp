@@ -1,0 +1,71 @@
+{
+  "manifest_version": "0.3",
+  "name": "flow-mcp",
+  "display_name": "Eureka Flow",
+  "version": "0.1.0",
+  "description": "Build, run, publish Eureka Flow visual workflows and manage credits from Claude — no code.",
+  "long_description": "Eureka Flow MCP server. Lets Claude (and other MCP clients) create visual workflows, run them, publish them publicly, and manage billing credits at flow.eureka.codes / billing.eureka.codes — all in natural language. No key to copy: leave the API key blank and just say \"log in\" — the assistant opens a browser for Google sign-in and provisions a key. One key unlocks both flows and credits.",
+  "author": {
+    "name": "Lemoncloud",
+    "url": "https://github.com/lemoncloud-io"
+  },
+  "homepage": "https://flow.eureka.codes",
+  "documentation": "https://github.com/lemoncloud-io/flow-mcp#readme",
+  "support": "https://github.com/lemoncloud-io/flow-mcp/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lemoncloud-io/flow-mcp"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "mcp",
+    "eureka",
+    "flow",
+    "workflow",
+    "automation",
+    "ai",
+    "credits",
+    "billing"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/stdio.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/stdio.js"
+      ],
+      "env": {
+        "FLOW_API_KEY": "${user_config.api_key}"
+      }
+    }
+  },
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "Eureka API Key (optional)",
+      "description": "Optional — leave this blank and just say \"log in\" in chat: the assistant opens a browser for Google sign-in and provisions a key for you. Or paste an existing key from https://flow.eureka.codes → sign in with Google → Create Key → Copy (looks like \"ec-...\"). Unlocks both flows and credits.",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  },
+  "tools_generated": true,
+  "tools": [
+    { "name": "flow_read", "description": "Read flows: list, load, export, graph; inspect nodes, ports, blocks, run history (read-only)" },
+    { "name": "flow_do", "description": "Edit & run flows: create, update, publish, save, clone, run; node + edge changes" },
+    { "name": "credit_read", "description": "Read credits: balance, purchasable packs, history (read-only)" },
+    { "name": "credit_do", "description": "Purchase credits: top up with the card on file" },
+    { "name": "auth", "description": "Sign in / out: browser-based Google login that provisions and stores an API key" }
+  ]
+}

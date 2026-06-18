@@ -15,12 +15,21 @@ src/
 ├── tools/
 │   ├── helpers.ts      # toolResult(), toolError(), mcpLog() response/logging helpers
 │   ├── schemas.ts      # Zod output schemas for structuredContent validation
-│   ├── completions.ts  # completable() auto-completion for flowId, blockType, stereo
-│   ├── flow-tools.ts   # 11 flow tools (profile/list/load/graph/create/update/save/run/clone/export/run_from)
+│   ├── completions.ts  # completable() auto-completion for flowId, blockType, stereo, productId
+│   ├── flow-tools.ts   # 12 flow tools (profile/list/load/graph/create/update/publish/save/run/clone/export/run_from)
 │   ├── node-tools.ts   # 8 tools (get/create/run/get_port/update/delete, edge_create/delete)
 │   ├── block-tools.ts  # 2 block tools (get/list with cache)
 │   ├── run-tools.ts    # 2 run tools (list/get execution history)
+│   ├── credit-tools.ts # 4 credit tools (balance/packs/purchase/history)
+│   ├── auth-tools.ts   # 3 auth tools (login/status/logout) — browser sign-in
+│   ├── dispatch.ts     # registers the public surface: flow_read/flow_do/credit_read/credit_do/auth (route action→captured handler)
 │   └── index.ts        # barrel export
+├── auth/
+│   ├── credentials.ts  # CredentialStore: env→~/.eureka/flow-mcp.json key resolution (0600)
+│   ├── endpoints.ts    # OAuth endpoint resolution (prod defaults, env-overridable)
+│   ├── web-core.ts     # Node @lemoncloud/lemon-web-core factory + in-memory storage
+│   ├── login.ts        # browser loopback OAuth → mint ec- key
+│   └── open-browser.ts # detached open/start/xdg-open
 ├── ws-client.ts        # WebSocket client for real-time execution monitoring + progress callbacks
 ├── server.ts           # McpServer setup + registerTool
 ├── stdio.ts            # Entry point: --help flag + 2-layer console suppression + JSON-RPC filter
@@ -29,6 +38,8 @@ src/
 
 ## Key Patterns
 
+- **5-tool public surface**: `server.ts` registers `flow_read` (11 read), `flow_do` (13 write/run), `credit_read` (3 read), `credit_do` (1 purchase), and `auth` (3: login/status/logout) via `registerDispatchTools` — split by **domain × access** so users approve 5 tools, not 31, and the read tools carry `readOnlyHint`. The granular `registerXTools` still define the real handlers + Zod schemas; `dispatch.ts` registers them against a fake server to **capture** their `{meta, handler}`, then routes `{action, params}` → the captured handler (params re-validated against the original schema; logging delegated to the real server). `FLOW_READ_ACTIONS`/`FLOW_DO_ACTIONS`/`CREDIT_READ_ACTIONS`/`CREDIT_DO_ACTIONS`/`AUTH_ACTIONS` must stay in sync with the granular tools and be pairwise disjoint — `dispatch.test.ts` enforces this. (Only the `*_read` tools are `readOnlyHint`.)
+- **Keyless start + browser login**: `FLOW_API_KEY` is optional (blank/empty coerced to unset). The server boots without a key; `FlowApiClient` injects the key per-request from `CredentialStore` (env wins, else `~/.eureka/flow-mcp.json`) and throws `FlowApiError('auth_required')` when absent. The `auth` tool's `login` action (`src/auth/login.ts`) opens a browser (loopback 127.0.0.1 OAuth), exchanges the code via `@lemoncloud/lemon-web-core`, mints an `ec-` key through `POST /_keys/0`, and persists it (0600). Endpoints in `src/auth/endpoints.ts` (prod defaults, env-overridable).
 - **MCP SDK v1.29** with v2 API (`McpServer` + `registerTool`)
 - **Zod v4** for input schemas (`import * as z from 'zod/v4'`)
 - **Error handling**: tool handlers return `{ isError: true, content: [...], structuredContent: { error, code? } }`, never throw
@@ -45,12 +56,19 @@ src/
 
 ```bash
 npm run build    # TypeScript compilation
+npm run bundle   # Build + pack Claude Desktop extension (flow-mcp.mcpb)
 npm run lint     # ESLint
 npm run lint:type # Type check (tsc --noEmit)
 npm run dev      # Watch mode
 npm start        # Run MCP server (stdio)
 npm test         # Run tests
 ```
+
+## Distribution
+
+- **npm**: `@lemoncloud/flow-mcp` (ships `dist/` only) — for `npx`/manual MCP config.
+- **Desktop Extension**: `manifest.json` (MCPB spec v0.3) → `npm run bundle` packs `flow-mcp.mcpb` for one-click Claude Desktop install with a GUI API-key prompt (`user_config.api_key` → `FLOW_API_KEY`). CI (`release.yml`) prunes devDeps, syncs the manifest version (`scripts/sync-manifest.mjs`), and attaches the `.mcpb` to each GitHub release.
+- **Auth/onboarding**: one `ec-…` key authenticates flows + credits. Users get it at flow.eureka.codes → Google sign-in → Create Key → Copy (shown once).
 
 ## API Endpoints Called
 
@@ -64,6 +82,7 @@ npm test         # Run tests
 | flow_clone | `GET /flows/:id/load` + `POST /flows/0/save` (two-step) |
 | flow_export | `GET /flows/:id/load` (returns clean JSON) |
 | flow_update | `POST /flows/:id/upsert` (metadata only) |
+| flow_publish | `POST /flows/:id/upsert` with `{ isPublic }` (open as public / private) |
 | flow_save | `POST /flows/:id/save` (full replace — use with caution) |
 | flow_run | Start nodes with `POST /nodes/:id/run?propagate=1` + WebSocket |
 | flow_run_from | `POST /nodes/:id/run?propagate=1` from specific node + WebSocket |
@@ -79,6 +98,12 @@ npm test         # Run tests
 | block_list | `GET /blocks/0/list?cores=1` (cached 5min) |
 | run_list | `GET /runs` (execution history) |
 | run_get | `GET /runs/:id` (run details + token usage) |
+| credit_balance | `GET /wallets/0/balance` (current wallet) |
+| credit_packs | `GET /public/products/0/list?limit=100` (public, no key) |
+| credit_purchase | `POST /credits/0/purchase` with `{ productId, requestId }` (card on file) |
+| credit_history | `GET /transactions/0/list` (credit ledger) |
+
+> Credit endpoints share the same eureka-flows-api base + `x-api-key` (`/_api_` prefix); `products` is served from `/public`. Note: backend does NOT auto-deduct credits on flow/node run today — running is currently free server-side; `credit_history` reflects charges once the backend wires run billing.
 
 ## Conventions
 

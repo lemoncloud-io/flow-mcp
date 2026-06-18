@@ -6,3 +6,6 @@ coverage/
 .idea/
 .claude/
 refer/
+*.mcpb
+.mcpb-build/
+.DS_Store

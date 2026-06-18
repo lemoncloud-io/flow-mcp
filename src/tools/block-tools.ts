@@ -1,5 +1,6 @@
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { FlowApiError } from '../api-client';
 import type { FlowApiClient } from '../api-client';
 import { toolError, toolResult } from './helpers';
 import { completableBlockType, completableStereo } from './completions';
@@ -24,8 +25,7 @@ export const registerBlockTools = (server: McpServer, client: FlowApiClient) => 
         },
         async ({ blockId }) => {
             try {
-                const result = await client.getBlock(blockId);
-                return toolResult(summarizeBlock(result));
+                return toolResult(summarizeBlock(await resolveBlock(client, blockId)));
             } catch (e) {
                 return toolError(e);
             }
@@ -61,6 +61,21 @@ export const registerBlockTools = (server: McpServer, client: FlowApiClient) => 
             }
         },
     );
+};
+
+/** Fetch a block by id; resolve processType/name/label via the catalog. */
+const resolveBlock = async (client: FlowApiClient, blockId: string): Promise<BlockView> => {
+    // Numeric & non-zero → real block ID; fetch directly. Non-numeric (or the "0" sentinel) →
+    // processType/name/label, resolve via catalog (avoids a speculative GET /blocks/:id that 404s
+    // and spams backend error-reporting; "0" is the backend's new-record sentinel, never a real block).
+    if (/^\d+$/.test(blockId) && Number(blockId) !== 0) return await client.getBlock(blockId);
+
+    const { list } = await client.listBlocks();
+    const match = list.find(
+        b => b.id === blockId || b.processType === blockId || b.name === blockId || b.label === blockId,
+    );
+    if (!match) throw new FlowApiError('not_found', `Block not found: ${blockId}`);
+    return match;
 };
 
 export const summarizeBlock = (b: BlockView) => ({

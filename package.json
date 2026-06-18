@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "bundle": "npm run build && node scripts/sync-manifest.mjs && npx -y @anthropic-ai/mcpb@latest pack . flow-mcp.mcpb",
     "start": "node dist/stdio.js",
     "dev": "tsc --watch",
     "lint": "eslint src/",
@@ -20,6 +21,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@lemoncloud/lemon-web-core": "^1.5.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.14.0",
     "dotenv": "^16.5.0",

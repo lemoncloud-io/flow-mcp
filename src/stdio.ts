@@ -27,13 +27,12 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
     process.exit(0);
 }
 
-// === Layer 1: Suppress all console.* methods ===
+// === Layer 1: Suppress stdout-bound console.* methods (keep error/warn on stderr) ===
 const noop = () => {};
+const consoleObj = console as unknown as Record<string, unknown>;
 for (const method of [
     'log',
     'info',
-    'warn',
-    'error',
     'debug',
     'trace',
     'dir',
@@ -49,8 +48,15 @@ for (const method of [
     'timeLog',
     'clear',
 ] as const) {
-    (console as unknown as Record<string, unknown>)[method] = noop;
+    consoleObj[method] = noop;
 }
+// error/warn are stderr-bound (safe for stdio MCP) — keep them visible so library errors aren't lost.
+const toStderr =
+    (prefix: string) =>
+    (...args: unknown[]) =>
+        process.stderr.write(`${prefix} ${args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')}\n`);
+consoleObj.error = toStderr('[console.error]');
+consoleObj.warn = toStderr('[console.warn]');
 
 // === Layer 2: Intercept stdout.write — only allow JSON-RPC messages ===
 const originalStdoutWrite = process.stdout.write.bind(process.stdout);

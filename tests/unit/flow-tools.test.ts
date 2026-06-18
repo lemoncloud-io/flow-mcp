@@ -218,6 +218,34 @@ describe('flow tool handlers', () => {
     });
   });
 
+  describe('flow_publish', () => {
+    it('should publish flow (isPublic=true) by default', async () => {
+      mockClient.upsertFlow.mockResolvedValue({ id: 'f-1', isPublic: true });
+
+      const result = await handlers.flow_publish({ flowId: 'f-1', isPublic: undefined });
+      const parsed = JSON.parse((result as { content: Array<{ text: string }> }).content[0].text);
+
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith('f-1', { isPublic: true });
+      expect(parsed.isPublic).toBe(true);
+    });
+
+    it('should unpublish when isPublic=false', async () => {
+      mockClient.upsertFlow.mockResolvedValue({ id: 'f-1', isPublic: false });
+
+      await handlers.flow_publish({ flowId: 'f-1', isPublic: false });
+
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith('f-1', { isPublic: false });
+    });
+
+    it('should return toolError on failure', async () => {
+      mockClient.upsertFlow.mockRejectedValue(new Error('publish failed'));
+
+      const result = await handlers.flow_publish({ flowId: 'f-1', isPublic: undefined });
+
+      expect((result as { isError: boolean }).isError).toBe(true);
+    });
+  });
+
   describe('flow_run', () => {
     it('should call runFlow with sync fallback when WS not configured', async () => {
       mockClient.runFlow.mockResolvedValue(makeFlow({ status: 'completed' }));

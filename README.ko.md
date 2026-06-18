@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <b><a href="https://flow.eureka.codes">Eureka Flow</a>를 AI에서 바로 사용할 수 있게 해주는 MCP 서버</b><br/>
+  <b><a href="https://flow.eureka.codes">Eureka Flow</a>를 AI에서 바로 쓸 수 있는 MCP 서버</b><br/>
   자연어로 워크플로우를 만들고, 실행하고, 결과를 확인하세요.
 </p>
 
@@ -28,14 +28,15 @@
   </picture>
 </p>
 
-## 이런 걸 할 수 있어요
+## 이런 게 됩니다
 
-**Claude Desktop**, **Cursor**, **Windsurf**, **VS Code (Continue/Cline)**, **Claude Code** 등 MCP를 지원하는 모든 AI 클라이언트에서 사용 가능합니다.
+**Claude Desktop**, **Cursor**, **Windsurf**, **VS Code (Continue/Cline)**, **Claude Code** 등 MCP를 지원하는 AI 클라이언트라면 어디서든 쓸 수 있습니다.
 
-AI에게 이렇게 말하면 됩니다:
+그냥 말하면 됩니다:
 
-| 하고 싶은 일 | Claude에게 이렇게 말하세요 |
-|-------------|------------------------|
+| 하고 싶은 일 | 이렇게 말하세요 |
+|-------------|----------------|
+| 로그인 (키 복붙 없음) | "Eureka 로그인해줘" |
 | 워크플로우 목록 보기 | "내 flow 목록 보여줘" |
 | 새 워크플로우 만들기 | "텍스트 입력 → 버퍼 → 미리보기 flow 만들어줘" |
 | 워크플로우 실행 | "1004897 flow 실행해봐" |
@@ -46,54 +47,65 @@ AI에게 이렇게 말하면 됩니다:
 | 연결 | "입력 노드와 버퍼 노드를 연결해줘" |
 | 삭제 | "연결 안 된 노드 정리해줘" |
 
-코드를 몰라도, 도구 이름을 몰라도 됩니다. 자연어로 요청하면 Claude가 알아서 처리합니다.
+코드도, 도구 이름도 몰라도 됩니다. 자연어로 요청하면 Claude가 알아서 처리합니다.
 
 ## 시작하기
 
-### 1단계: 설치
+> **준비물:** [**Claude Desktop**](https://claude.ai/download) 설치, 무료 Eureka 계정(Google 로그인만 하면 됨 — 별도 가입 양식 없음). Claude Desktop에 Node.js 런타임이 내장돼 있어 따로 설치할 건 없습니다.
+
+### 🚀 원클릭 설치 — Claude Desktop (추천, 터미널 불필요)
+
+1. **확장 파일 다운로드.** [**Releases 페이지**](https://github.com/lemoncloud-io/flow-mcp/releases/latest)에서 **Assets**를 열고 **`flow-mcp.mcpb`** 다운로드. *("Source code" 파일은 무시 — 필요 없습니다.)*
+2. **설치.** **`flow-mcp.mcpb`** 더블클릭 → Claude Desktop **설치 창**이 열림 → **API 키 칸은 비워두고**(다음 단계에서 챗으로 로그인) **Install** 클릭.
+   - *Mac이 "확인되지 않은 개발자" 경고?* 파일 우클릭 → **열기** → **열기**. 다운로드한 파일에서는 정상입니다.
+   - *설치 창이 안 뜨면?* Claude Desktop → **설정 → 확장(Extensions)** 에서 파일을 드래그하세요.
+3. **로그인 — 키 복붙 없음.** Claude에게 **"Eureka 로그인해줘"** 라고 하면 구글 로그인 브라우저 창이 열립니다. 로그인만 완료하면 Claude가 API 키를 자동 발급·저장합니다. *(직접 키를 쓰고 싶다면 [flow.eureka.codes](https://flow.eureka.codes) → 로그인 → Create Key → Copy 후 2단계의 API 키 칸에 붙여넣으세요.)*
+4. **작동 확인.** Claude에게 *"내 flow 목록 보여줘"* — *"flow가 없습니다"* 라도 뜨면 연결 성공! 🎉 이어서 *"플로우 만들어줘"* 또는 *"내 크레딧 잔액 확인해줘"*.
+   - *빨간 오류나 "server disconnected"가 보이면?* **설정 → 확장(Extensions)** 에서 flow-mcp가 켜져 있는지 확인하고 Claude에게 다시 *"로그인해줘"* 해보세요.
+
+> 로그인 한 번으로 **플로우 + 크레딧(빌링)** 모두 사용 가능. 키 복붙도, 설정 파일 편집도 없습니다.
+
+### 다른 클라이언트 (Cursor · Windsurf · VS Code · Claude Code)
+
+<details>
+<summary><b>수동 설치</b> (npm + 설정 파일)</summary>
+
+**1. 설치**
 
 ```bash
 npm install -g @lemoncloud/flow-mcp
 ```
 
-### 2단계: API 키 발급
-
-[Eureka Codes 콘솔](https://console.eureka.codes)에서 API 키를 발급받으세요.
-
-### 3단계: MCP 클라이언트 설정
-
-**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json` 파일에 추가:
+**2. 클라이언트 MCP 설정에 추가** — API 키 없어도 됩니다. Claude Desktop 설정 파일: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "flow-mcp": {
       "command": "npx",
-      "args": ["-y", "@lemoncloud/flow-mcp"],
-      "env": {
-        "FLOW_API_KEY": "발급받은-API-키"
-      }
+      "args": ["-y", "@lemoncloud/flow-mcp"]
     }
   }
 }
 ```
 
-**Cursor / Windsurf** — IDE의 MCP 설정에 동일한 `mcpServers` 내용을 추가하세요.
+- **Cursor / Windsurf / VS Code (Continue/Cline):** IDE의 MCP 설정에 동일한 `mcpServers` 블록 추가.
+- **Claude Code:** `claude mcp add flow-mcp -- npx -y @lemoncloud/flow-mcp`
 
-### 4단계: 시작!
+**3. 재시작** 후 **"Eureka 로그인해줘"** — 브라우저 구글 로그인으로 키가 자동 발급됩니다. 이어서 **"내 flow 목록 보여줘"**.
 
-클라이언트를 재시작하고 **"내 flow 목록 보여줘"** 라고 말해보세요.
+> 고정 키를 쓰고 싶다면? [flow.eureka.codes](https://flow.eureka.codes)에서 발급(로그인 → **Create Key** → **Copy**) 후 위 설정에 `"env": { "FLOW_API_KEY": "ec-…" }` 를 추가하면 로그인 없이 바로 동작합니다.
 
-> **참고:** `FLOW_API_KEY`만 있으면 바로 사용할 수 있습니다. API URL은 기본값이 설정되어 있습니다.
-
-### 설정 옵션
+**환경변수** — 모두 선택사항. `FLOW_API_KEY`는 챗 로그인을 건너뛸 때만 필요합니다:
 
 | 환경변수 | 필수 | 기본값 | 설명 |
 |---------|:---:|--------|------|
-| `FLOW_API_KEY` | O | — | API 인증 키 |
+| `FLOW_API_KEY` | | — | API 키 (선택 — `auth` 툴이 브라우저 로그인으로 발급) |
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API 서버 주소 |
 | `FLOW_API_TIMEOUT` | | `30000` | API 요청 타임아웃 (ms) |
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket 주소 (실시간 진행상황 모니터링) |
+
+</details>
 
 ## 사용 예시
 
@@ -136,35 +148,61 @@ npm install -g @lemoncloud/flow-mcp
 → 포트 데이터 (값, 타입, 타임스탬프)
 ```
 
-## 23개 도구
+### 크레딧 관리
 
-자연어로 요청하면 Claude가 자동으로 적절한 도구를 선택합니다.
+> **처음 충전하시나요?** 먼저 **[billing.eureka.codes](https://billing.eureka.codes)** 에서 카드를 등록하세요. 잔액·팩·내역은 카드 없이도 조회되지만, 결제에는 등록된 카드가 필요합니다.
 
-| 도구 | 하는 일 |
-|------|--------|
-| `profile_get` | API 키 설정 상태 확인 |
-| `block_list` | 사용 가능한 블록 종류 조회 |
-| `block_get` | 블록 상세 조회 (ID 또는 이름) |
-| `flow_list` | 내 워크플로우 목록 (페이지네이션 지원) |
-| `flow_load` | 워크플로우 상세 로드 (노드, 엣지, 포트) |
-| `flow_graph` | Mermaid 다이어그램 시각화 |
-| `flow_create` | 새 워크플로우 생성 (노드+엣지 한 번에) |
-| `flow_update` | 워크플로우 이름/설명 변경 |
-| `flow_save` | 전체 재구성 (주의: 기존 노드 ID 변경됨) |
-| `flow_clone` | 워크플로우 복제 |
-| `flow_export` | 워크플로우 JSON 내보내기 |
-| `flow_run` | 워크플로우 실행 + 실시간 모니터링 |
-| `flow_run_from` | 특정 노드부터 실행 |
-| `node_get` | 단일 노드 상세 조회 |
-| `node_create` | 기존 flow에 노드 추가 |
-| `node_run` | 단일 노드 실행 |
-| `node_get_port` | 노드 입출력 데이터 조회 |
-| `node_update` | 노드 설정/라벨/위치 등 수정 |
-| `node_delete` | 노드 삭제 |
-| `edge_create` | 두 노드 연결 |
-| `edge_delete` | 연결 제거 |
-| `run_list` | 실행 이력 조회 (토큰 사용량 포함) |
-| `run_get` | 실행 상세 조회 |
+```
+"내 크레딧 잔액 확인해줘"
+→ 전체 / 사용 가능 / 보류 크레딧
+
+"크레딧 팩 보여줘"
+→ 구매 가능한 팩 + USD 가격
+
+"1,000 크레딧 충전해줘"
+→ 등록된 카드로 결제 (카드 없으면 billing.eureka.codes에서 등록)
+
+"내 크레딧 사용 내역 보여줘"
+→ 충전/사용 내역 (최신순)
+```
+
+### 플로우 공개
+
+```
+"1004897 플로우 공개해줘"        → public으로 전환
+"1004897 플로우 비공개로 바꿔"   → 비공개로 전환
+```
+
+## 5개 도구, 31개 액션
+
+flow-mcp는 도구가 **5개**뿐입니다 — 권한 승인을 31번이 아니라 몇 번만 하면 됩니다. 도메인(flow / credit) × 접근(**read** 읽기 / **do** 쓰기)으로 나뉘고, 로그인용 **auth** 도구가 별도로 있습니다. 읽기 도구는 read-only로 표시되며, ⚠️ 변경·결제는 `*_do` 도구에만 모여 있습니다. 도구 이름을 직접 부를 일은 없습니다 — Claude에게 그냥 말하면("로그인", "플로우 공개해줘", "크레딧 확인") 알맞은 액션을 자동으로 선택합니다.
+
+### `flow_read` — 플로우 읽기 (read-only)
+
+`{ action, params }` · 액션:
+`profile_get` · `flow_list` · `flow_load` · `flow_graph` · `flow_export` · `node_get` · `node_get_port` · `block_get` · `block_list` · `run_list` · `run_get`
+
+### `flow_do` — 플로우 수정 & 실행 ⚠️
+
+`{ action, params }` · 액션:
+`flow_create` · `flow_update` · `flow_publish` · `flow_save` · `flow_clone` · `flow_run` · `flow_run_from` · `node_create` · `node_run` · `node_update` · `node_delete` · `edge_create` · `edge_delete`
+
+### `credit_read` — 크레딧 읽기 (read-only)
+
+`{ action, params }` · 액션:
+`credit_balance` · `credit_packs` · `credit_history`
+
+### `credit_do` — 크레딧 충전 ⚠️
+
+`{ action, params }` · 액션:
+`credit_purchase`
+
+### `auth` — 로그인 / 로그아웃
+
+`{ action, params }` · 액션:
+`login` · `status` · `logout`
+
+> `login`은 구글 로그인 브라우저를 열어 API 키를 자동 발급·저장합니다 — 복붙 불필요. 도구마다 **"Always allow" 한 번**씩이면 끝. 읽기 도구 2개는 read-only라 부담 없이 허용할 수 있고, 데이터를 변경하거나 카드를 결제하는 건 `*_do` 도구뿐입니다.
 
 ---
 
@@ -213,7 +251,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 23 tools)
+  -> server.ts (McpServer + 5 dispatch tools -> 31 actions)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)

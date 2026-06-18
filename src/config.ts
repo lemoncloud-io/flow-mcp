@@ -6,11 +6,17 @@ export const DEFAULT_WS_URL = 'wss://wss.eureka.codes/wss-v1';
 
 const configSchema = z.object({
     FLOW_API_URL: z.url().default('https://api.eureka.codes/flw-v1').describe('Eureka Flows API base URL'),
-    FLOW_API_KEY: z.string().min(1).describe('API key for authentication'),
+    FLOW_API_KEY: z
+        // Blank/whitespace (e.g. an unfilled .mcpb config slot injects "") counts as unset, not invalid.
+        .preprocess(
+            v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+            z.optional(z.string().trim().min(1)),
+        )
+        .describe('API key for authentication (optional — blank is fine; the auth tool mints one via browser login)'),
     FLOW_API_TIMEOUT: z.optional(z.coerce.number()).default(30000),
     FLOW_WS_URL: z
         .optional(z.string())
-        .transform(v => v || DEFAULT_WS_URL)
+        .transform(v => v?.trim() || DEFAULT_WS_URL)
         .describe('WebSocket endpoint'),
 });
 
@@ -35,8 +41,10 @@ export const getConfigOrThrow = (): FlowApiConfig => {
     const config = getConfig();
     if (!config) {
         throw new Error(
-            'Missing or invalid environment variables: FLOW_API_URL and FLOW_API_KEY. ' +
-                'Set them in .env or pass via Claude Desktop env config. Check stderr for details.',
+            'Invalid flow-mcp configuration (check FLOW_API_URL / FLOW_API_TIMEOUT). ' +
+                'FLOW_API_KEY is optional — if unset, ask the assistant to log in (the auth tool opens a browser) ' +
+                'or get a key at https://flow.eureka.codes → sign in with Google → Create Key → Copy. ' +
+                'Check stderr for validation details.',
         );
     }
     return config;

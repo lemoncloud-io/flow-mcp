@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FlowApiClient, FlowApiError } from '../../src/api-client';
+import { CredentialStore } from '../../src/auth/credentials';
 import { makeConfig, makeFlow, makeSaveFlow, makeNodeView, makePortData, makeBlock, makeListResult } from '../helpers/factories';
 
 // Spy on axios methods via the internal client instance
@@ -16,25 +17,48 @@ describe('FlowApiClient', () => {
     it('should strip trailing slash from FLOW_API_URL', () => {
       const { axiosInstance } = createClient({ FLOW_API_URL: 'https://api.example.com///' });
 
-      expect(axiosInstance.defaults.baseURL).toMatch(/^https:\/\/api\.example\.com\/_apis$/);
+      expect(axiosInstance.defaults.baseURL).toMatch(/^https:\/\/api\.example\.com\/_api_$/);
     });
 
-    it('should use /_api_ path for ec- prefixed keys', () => {
+    it('should use the /_api_ path for ec- prefixed keys', () => {
       const { axiosInstance } = createClient({ FLOW_API_KEY: 'ec-test-key' });
 
       expect(axiosInstance.defaults.baseURL).toContain('/_api_');
     });
 
-    it('should use /_apis path for non-ec keys', () => {
+    it('should use the /_api_ path regardless of key format', () => {
       const { axiosInstance } = createClient({ FLOW_API_KEY: 'normal-key' });
 
-      expect(axiosInstance.defaults.baseURL).toContain('/_apis');
+      expect(axiosInstance.defaults.baseURL).toContain('/_api_');
     });
 
-    it('should set x-api-key header', () => {
+    it('should inject x-api-key via the request interceptor', () => {
       const { axiosInstance } = createClient({ FLOW_API_KEY: 'my-secret-key' });
+      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
+      const set = vi.fn();
 
-      expect(axiosInstance.defaults.headers['x-api-key']).toBe('my-secret-key');
+      interceptor({ headers: { set } });
+
+      expect(set).toHaveBeenCalledWith('x-api-key', 'my-secret-key');
+    });
+
+    it('should throw auth_required when no key is available', () => {
+      const client = new FlowApiClient(makeConfig(), { getApiKey: () => null } as unknown as CredentialStore);
+      const axiosInstance = (
+        client as unknown as {
+          client: { interceptors: { request: { handlers: Array<{ fulfilled: (c: unknown) => unknown }> } } };
+        }
+      ).client;
+      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
+
+      let thrown: unknown;
+      try {
+        interceptor({ headers: { set: vi.fn() } });
+      } catch (e) {
+        thrown = e;
+      }
+      expect(thrown).toBeInstanceOf(FlowApiError);
+      expect((thrown as FlowApiError).code).toBe('auth_required');
     });
   });
 
@@ -230,6 +254,61 @@ describe('FlowApiClient', () => {
     });
   });
 
+  describe('credit operations', () => {
+    it('should call GET /wallets/0/balance', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: { total: 1000 } });
+
+      const result = await client.getWalletBalance();
+
+      expect(axiosInstance.get).toHaveBeenCalledWith('/wallets/0/balance');
+      expect(result).toEqual({ total: 1000 });
+    });
+
+    it('should call absolute /public/products/0/list URL with limit', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makeListResult([]) });
+
+      await client.listProducts();
+
+      expect(axiosInstance.get).toHaveBeenCalledWith('https://api.example.com/public/products/0/list', {
+        params: { limit: 100 },
+      });
+    });
+
+    it('should POST /credits/0/purchase with productId and requestId', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'post').mockResolvedValue({ data: { id: 'tx-1' } });
+
+      await client.purchaseCredits('prod-1', 'req-1');
+
+      expect(axiosInstance.post).toHaveBeenCalledWith('/credits/0/purchase', {
+        productId: 'prod-1',
+        requestId: 'req-1',
+      });
+    });
+
+    it('should GET /transactions/0/list with no params by default', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makeListResult([]) });
+
+      await client.listTransactions();
+
+      expect(axiosInstance.get).toHaveBeenCalledWith('/transactions/0/list', { params: {} });
+    });
+
+    it('should include stereo/limit/page filters in /transactions/0/list', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makeListResult([]) });
+
+      await client.listTransactions({ stereo: 'use', limit: 10, page: 2 });
+
+      expect(axiosInstance.get).toHaveBeenCalledWith('/transactions/0/list', {
+        params: { limit: 10, page: 2, stereo: 'use' },
+      });
+    });
+  });
+
   describe('error normalization', () => {
     // Access private normalizeError via bracket notation
     const callNormalize = (client: FlowApiClient, axiosError: Record<string, unknown>): FlowApiError =>
@@ -277,6 +356,14 @@ describe('FlowApiClient', () => {
 
       expect(err.code).toBe('auth');
       expect(err.message).toContain('403');
+    });
+
+    it('should normalize 402 to payment error', () => {
+      const { client } = createClient();
+      const err = callNormalize(client, createAxiosError({ status: 402, data: { message: 'card missing' } }));
+
+      expect(err.code).toBe('payment');
+      expect(err.message).toContain('billing.eureka.codes');
     });
 
     it('should normalize 404 to not_found error', () => {

@@ -36,6 +36,7 @@ Just ask in natural language:
 
 | What you want | Say this to Claude |
 |---------------|-------------------|
+| Sign in (no key to copy) | "Log in to Eureka" |
 | List workflows | "Show my flows" |
 | Create a workflow | "Create a flow: text input → buffer → preview" |
 | Run a workflow | "Run flow 1004897" |
@@ -50,50 +51,61 @@ No code required. No tool names to remember. Just ask in natural language.
 
 ## Quick Start
 
-### Step 1: Install
+> **You'll need:** the [**Claude Desktop**](https://claude.ai/download) app installed, and a free Eureka account (just sign in with Google — no signup form). Claude Desktop bundles its own Node.js runtime, so there's nothing else to install.
+
+### 🚀 One-Click Install — Claude Desktop (recommended, no terminal)
+
+1. **Download the extension.** On the [**Releases page**](https://github.com/lemoncloud-io/flow-mcp/releases/latest), open the **Assets** section and download **`flow-mcp.mcpb`**. *(Ignore the "Source code" files — you don't need those.)*
+2. **Install it.** Double-click **`flow-mcp.mcpb`**. Claude Desktop opens an **install window** — **leave the API Key field blank** (you'll log in from chat in the next step) and click **Install**.
+   - *Mac says "unidentified developer"?* Right-click the file → **Open** → **Open**. That's normal for downloads.
+   - *No install window appeared?* Open Claude Desktop → **Settings → Extensions** and drag the file in.
+3. **Log in — no key to copy.** In Claude, just say **"Log in to Eureka."** A browser window opens for **Google sign-in** — finish there, and Claude provisions and stores your API key automatically. *(Prefer to paste a key yourself? Get one at [flow.eureka.codes](https://flow.eureka.codes) → sign in → Create Key → Copy, and put it in the API Key field at step 2 instead.)*
+4. **Check it works.** Ask Claude *"Show my flows"*. If it answers at all — even *"you have no flows yet"* — you're connected! 🎉 Then try *"Create a flow"* or *"Check my credit balance"*.
+   - *See a red error or "server disconnected" instead?* Open **Settings → Extensions** and confirm flow-mcp is enabled, then ask Claude to *"log in"* again.
+
+> One login unlocks everything — **flows** and **billing credits**. No key to copy, nothing technical to edit.
+
+### Other clients (Cursor · Windsurf · VS Code · Claude Code)
+
+<details>
+<summary><b>Manual install</b> (npm + config file)</summary>
+
+**1. Install**
 
 ```bash
 npm install -g @lemoncloud/flow-mcp
 ```
 
-### Step 2: Get an API Key
-
-Get your API key from [Eureka Codes Console](https://console.eureka.codes).
-
-### Step 3: Configure Your MCP Client
-
-**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**2. Add to your client's MCP config** — no API key needed. Claude Desktop file: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "flow-mcp": {
       "command": "npx",
-      "args": ["-y", "@lemoncloud/flow-mcp"],
-      "env": {
-        "FLOW_API_KEY": "your-api-key"
-      }
+      "args": ["-y", "@lemoncloud/flow-mcp"]
     }
   }
 }
 ```
 
-**Cursor / Windsurf** — add the same `mcpServers` config to your IDE's MCP settings.
+- **Cursor / Windsurf / VS Code (Continue/Cline):** add the same `mcpServers` block to the IDE's MCP settings.
+- **Claude Code:** `claude mcp add flow-mcp -- npx -y @lemoncloud/flow-mcp`
 
-### Step 4: Go!
+**3. Restart** your client and say **"Log in to Eureka"** — a browser opens for Google sign-in and your key is provisioned automatically. Then try **"Show my flows"**.
 
-Restart your client and say **"Show my flows"**.
+> Prefer a fixed key? Get one at [flow.eureka.codes](https://flow.eureka.codes) (sign in → **Create Key** → **Copy**) and add `"env": { "FLOW_API_KEY": "ec-…" }` to the config above instead of logging in.
 
-> **Note:** Only `FLOW_API_KEY` is required. API URL has a sensible default.
-
-### Configuration
+**Environment variables** — all optional; `FLOW_API_KEY` is only needed if you skip the in-chat login:
 
 | Variable | Required | Default | Description |
 |----------|:--------:|---------|-------------|
-| `FLOW_API_KEY` | Yes | — | API authentication key |
+| `FLOW_API_KEY` | | — | API key (optional — the `auth` tool mints one via browser login) |
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API server URL |
 | `FLOW_API_TIMEOUT` | | `30000` | Request timeout (ms) |
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket URL for real-time execution monitoring |
+
+</details>
 
 ## Examples
 
@@ -136,35 +148,61 @@ Restart your client and say **"Show my flows"**.
 → Port data (value, type, timestamp)
 ```
 
-## 23 Tools
+### Manage Credits
 
-Claude automatically selects the right tool based on your request.
+> **First top-up?** Add a card at **[billing.eureka.codes](https://billing.eureka.codes)** first. Balance, packs, and history work without one — but a purchase needs a card on file.
 
-| Tool | What it does |
-|------|-------------|
-| `profile_get` | Check API key configuration status |
-| `block_list` | List available block types |
-| `block_get` | Get block details by ID or name |
-| `flow_list` | List your workflows (with pagination) |
-| `flow_load` | Load full flow state (nodes, edges, ports) |
-| `flow_graph` | Mermaid diagram visualization |
-| `flow_create` | Create new flow (nodes + edges at once) |
-| `flow_update` | Update flow name / description |
-| `flow_save` | Full rebuild (caution: reassigns node IDs) |
-| `flow_clone` | Duplicate a flow |
-| `flow_export` | Export flow as portable JSON |
-| `flow_run` | Execute flow + real-time monitoring |
-| `flow_run_from` | Run flow from a specific node |
-| `node_get` | Get single node details |
-| `node_create` | Add node to existing flow |
-| `node_run` | Execute single node |
-| `node_get_port` | Inspect node input/output data |
-| `node_update` | Update node config / label / position |
-| `node_delete` | Delete a node |
-| `edge_create` | Connect two nodes |
-| `edge_delete` | Remove a connection |
-| `run_list` | List execution history with token usage |
-| `run_get` | Get execution run details |
+```
+"Check my credit balance"
+→ Total / available / held credits
+
+"Show credit packs"
+→ Purchasable packs with USD prices
+
+"Top up 1,000 credits"
+→ Charges the card on file (enroll one at billing.eureka.codes if you haven't)
+
+"Show my credit history"
+→ Top-ups and usage, newest first
+```
+
+### Publish a Flow
+
+```
+"Publish flow 1004897"        → opens it to the public
+"Make flow 1004897 private"   → unpublishes it
+```
+
+## 5 Tools, 31 Actions
+
+flow-mcp exposes just **five** tools — so you approve permissions a handful of times, not 31. They split by domain (flow / credit) and by access (**read** vs **do**), plus an **auth** tool for sign-in. The read tools are marked read-only; the "do" tools are where the ⚠️ writes and charges live. You never call them by name; just talk to Claude ("log in", "publish my flow", "check my credits") and it picks the right action.
+
+### `flow_read` — read flows (read-only)
+
+`{ action, params }` · Actions:
+`profile_get` · `flow_list` · `flow_load` · `flow_graph` · `flow_export` · `node_get` · `node_get_port` · `block_get` · `block_list` · `run_list` · `run_get`
+
+### `flow_do` — edit & run flows ⚠️
+
+`{ action, params }` · Actions:
+`flow_create` · `flow_update` · `flow_publish` · `flow_save` · `flow_clone` · `flow_run` · `flow_run_from` · `node_create` · `node_run` · `node_update` · `node_delete` · `edge_create` · `edge_delete`
+
+### `credit_read` — read credits (read-only)
+
+`{ action, params }` · Actions:
+`credit_balance` · `credit_packs` · `credit_history`
+
+### `credit_do` — purchase credits ⚠️
+
+`{ action, params }` · Actions:
+`credit_purchase`
+
+### `auth` — sign in / out
+
+`{ action, params }` · Actions:
+`login` · `status` · `logout`
+
+> `login` opens a browser for Google sign-in and provisions + stores your API key — no copy-paste. Click **"Always allow"** once for each tool you use and you're set. The two read tools are read-only and safe to allow; the `*_do` tools are the only ones that change anything or charge your card.
 
 ---
 
@@ -213,7 +251,7 @@ npm run build
 
 ```
 stdio.ts (console suppression + JSON-RPC filter)
-  -> server.ts (McpServer + 23 tools)
+  -> server.ts (McpServer + 5 dispatch tools -> 31 actions)
     -> tools/*.ts (tool handlers)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)

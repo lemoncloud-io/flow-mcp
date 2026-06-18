@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { registerBlockTools, summarizeBlock } from '../../src/tools';
+import { FlowApiError } from '../../src/api-client';
 import { makeApiClient, makeBlock, makeBlockDef, makePortDef, makeListResult, type MockApiClient } from '../helpers/factories';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
@@ -156,5 +157,67 @@ describe('block_list handler', () => {
     const result = await handlers.block_list({ stereo: undefined });
 
     expect((result as { isError: boolean }).isError).toBe(true);
+  });
+});
+
+describe('block_get handler', () => {
+  let mockClient: MockApiClient;
+  let handlers: Record<string, ToolHandler>;
+
+  beforeEach(() => {
+    mockClient = makeApiClient();
+    handlers = captureHandlers(mockClient);
+  });
+
+  const parse = (result: unknown) => JSON.parse((result as { content: Array<{ text: string }> }).content[0].text);
+
+  it('should fetch directly via getBlock for a numeric block ID', async () => {
+    mockClient.getBlock.mockResolvedValue(makeBlock({ id: '0008', processType: 'input-text' }));
+
+    const result = await handlers.block_get({ blockId: '0008' });
+
+    expect(mockClient.getBlock).toHaveBeenCalledWith('0008');
+    expect(mockClient.listBlocks).not.toHaveBeenCalled();
+    expect(parse(result).type).toBe('input-text');
+  });
+
+  it('should resolve a processType via the catalog without calling getBlock', async () => {
+    mockClient.listBlocks.mockResolvedValue(makeListResult([makeBlock({ id: '0008', processType: 'input-text' })]));
+
+    const result = await handlers.block_get({ blockId: 'input-text' });
+
+    expect(mockClient.listBlocks).toHaveBeenCalled();
+    expect(mockClient.getBlock).not.toHaveBeenCalled();
+    expect((result as { isError?: boolean }).isError).toBeUndefined();
+    expect(parse(result).type).toBe('input-text');
+  });
+
+  it('should resolve a name/label via the catalog', async () => {
+    mockClient.listBlocks.mockResolvedValue(
+      makeListResult([makeBlock({ id: '0008', processType: 'input-text', name: '텍스트 입력' })]),
+    );
+
+    const result = await handlers.block_get({ blockId: '텍스트 입력' });
+
+    expect(mockClient.getBlock).not.toHaveBeenCalled();
+    expect(parse(result).type).toBe('input-text');
+  });
+
+  it('should return toolError when a non-numeric id has no catalog match', async () => {
+    mockClient.listBlocks.mockResolvedValue(makeListResult([makeBlock({ id: '0008', processType: 'other' })]));
+
+    const result = await handlers.block_get({ blockId: 'nope' });
+
+    expect(mockClient.getBlock).not.toHaveBeenCalled();
+    expect((result as { isError: boolean }).isError).toBe(true);
+  });
+
+  it('should return toolError when a numeric id 404s', async () => {
+    mockClient.getBlock.mockRejectedValue(new FlowApiError('not_found', 'Not found'));
+
+    const result = await handlers.block_get({ blockId: '9999' });
+
+    expect((result as { isError: boolean }).isError).toBe(true);
+    expect(mockClient.listBlocks).not.toHaveBeenCalled();
   });
 });
