@@ -3,16 +3,18 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { registerDispatchTools } from '../../src/tools';
+import { CredentialStore } from '../../src/auth/credentials';
 import { makeConfig, makeFlow, makeBlock, makePortData, makeListResult, makeSaveFlow, makeNodeView, makeRun } from '../helpers/factories';
 import type { FlowApiClient } from '../../src/api-client';
 
-// Create a real McpServer (2 dispatch tools) with a mock API client
+// Create a real McpServer (dispatch tools) with a mock API client. A non-empty env key keeps
+// auth/status deterministic regardless of any ~/.eureka login file on the host.
 const createTestServer = (mockClient: Record<string, ReturnType<typeof vi.fn>>) => {
   const server = new McpServer(
     { name: 'flow-mcp-test', version: '0.0.1' },
     { capabilities: { tools: {}, logging: {} } },
   );
-  registerDispatchTools(server, mockClient as unknown as FlowApiClient, makeConfig());
+  registerDispatchTools(server, mockClient as unknown as FlowApiClient, makeConfig(), new CredentialStore('ec-test-env-key'));
   return server;
 };
 
@@ -25,6 +27,7 @@ const flowReadCall = callOn('flow_read');
 const flowDoCall = callOn('flow_do');
 const creditReadCall = callOn('credit_read');
 const creditDoCall = callOn('credit_do');
+const authCall = callOn('auth');
 
 describe('MCP Protocol Integration (dispatch tools)', () => {
   let server: McpServer;
@@ -67,9 +70,9 @@ describe('MCP Protocol Integration (dispatch tools)', () => {
     await server.close();
   });
 
-  it('should expose exactly four tools: flow_read, flow_do, credit_read, credit_do', async () => {
+  it('should expose exactly five tools: flow_read, flow_do, credit_read, credit_do, auth', async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['credit_do', 'credit_read', 'flow_do', 'flow_read']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['auth', 'credit_do', 'credit_read', 'flow_do', 'flow_read']);
   });
 
   it('should have outputSchema on all tools', async () => {
@@ -86,6 +89,7 @@ describe('MCP Protocol Integration (dispatch tools)', () => {
     expect(byName.credit_read.annotations?.readOnlyHint).toBe(true);
     expect(byName.flow_do.annotations?.readOnlyHint).toBeFalsy();
     expect(byName.credit_do.annotations?.readOnlyHint).toBeFalsy();
+    expect(byName.auth.annotations?.readOnlyHint).toBeFalsy();
   });
 
   it('should route flow_read/profile_get', async () => {
@@ -139,6 +143,21 @@ describe('MCP Protocol Integration (dispatch tools)', () => {
     expect(mockApi.purchaseCredits).toHaveBeenCalled();
   });
 
+  it('should route auth/status (authenticated via env key)', async () => {
+    const response = await authCall(client, 'status');
+    const data = response.structuredContent as Record<string, unknown>;
+    expect(data.authenticated).toBe(true);
+    expect(data.source).toBe('env');
+    expect(data.uid).toBe('u1');
+  });
+
+  it('should route auth/logout', async () => {
+    const response = await authCall(client, 'logout');
+    const data = response.structuredContent as Record<string, unknown>;
+    expect(response.isError).toBeFalsy();
+    expect(data.message).toMatch(/logged out/i);
+  });
+
   it('should propagate structured errors through the dispatcher', async () => {
     mockApi.listFlows.mockRejectedValue(new Error('Service unavailable'));
     const response = await flowReadCall(client, 'flow_list');
@@ -158,6 +177,16 @@ describe('MCP Protocol Integration (dispatch tools)', () => {
 
   it('should reject a flow action on a credit tool', async () => {
     const response = await creditDoCall(client, 'flow_create', { name: 'x' });
+    expect(response.isError).toBe(true);
+  });
+
+  it('should reject a flow action on the auth tool', async () => {
+    const response = await authCall(client, 'flow_create', { name: 'x' });
+    expect(response.isError).toBe(true);
+  });
+
+  it('should reject an auth action on a flow tool', async () => {
+    const response = await flowReadCall(client, 'login');
     expect(response.isError).toBe(true);
   });
 

@@ -7,8 +7,10 @@ import { registerNodeTools } from './node-tools';
 import { registerBlockTools } from './block-tools';
 import { registerRunTools } from './run-tools';
 import { registerCreditTools } from './credit-tools';
+import { registerAuthTools } from './auth-tools';
 import { toolError } from './helpers';
 import { PassthroughSchema } from './schemas';
+import type { CredentialStore } from '../auth/credentials';
 
 /** Flow domain, read-only — list/load/export flows, graph, inspect nodes/ports/blocks/runs. */
 export const FLOW_READ_ACTIONS = [
@@ -48,12 +50,20 @@ export const CREDIT_READ_ACTIONS = ['credit_balance', 'credit_packs', 'credit_hi
 /** Billing domain, mutating — purchase (charges the card on file). */
 export const CREDIT_DO_ACTIONS = ['credit_purchase'] as const;
 
+/** Auth — browser login, status, logout. */
+export const AUTH_ACTIONS = ['login', 'status', 'logout'] as const;
+
 type ToolMeta = { title?: string; description?: string; inputSchema?: z.ZodType };
 type CapturedHandler = (args: Record<string, unknown>, extra: unknown) => Promise<unknown>;
 type Captured = Record<string, { meta: ToolMeta; handler: CapturedHandler }>;
 
 /** Register the granular tools against a fake server to capture their handlers + schemas. */
-const captureHandlers = (server: McpServer, client: FlowApiClient, config: FlowApiConfig): Captured => {
+const captureHandlers = (
+    server: McpServer,
+    client: FlowApiClient,
+    config: FlowApiConfig,
+    credentials: CredentialStore,
+): Captured => {
     const captured: Captured = {};
     const fake = {
         registerTool: (name: string, meta: ToolMeta, handler: CapturedHandler) => {
@@ -68,6 +78,7 @@ const captureHandlers = (server: McpServer, client: FlowApiClient, config: FlowA
     registerBlockTools(fake, client);
     registerRunTools(fake, client);
     registerCreditTools(fake, client);
+    registerAuthTools(fake, client, credentials, config);
     return captured;
 };
 
@@ -126,15 +137,21 @@ const registerDispatchTool = (server: McpServer, captured: Captured, spec: Dispa
 };
 
 /**
- * Register four domain × access tools instead of 28 granular ones:
+ * Register five public tools instead of the granular ones:
  * - flow_read   (read-only): list/load/export flows, graph, inspect nodes/ports/blocks/runs
  * - flow_do     (writes/runs): create/update/publish/save/clone/run flows, node + edge edits
  * - credit_read (read-only): balance, packs, history
  * - credit_do   (writes): purchase
+ * - auth        (login/status/logout): browser sign-in that mints + stores an API key
  * Read tools carry readOnlyHint so clients can treat them as safe. Each takes { action, params }.
  */
-export const registerDispatchTools = (server: McpServer, client: FlowApiClient, config: FlowApiConfig) => {
-    const captured = captureHandlers(server, client, config);
+export const registerDispatchTools = (
+    server: McpServer,
+    client: FlowApiClient,
+    config: FlowApiConfig,
+    credentials: CredentialStore,
+) => {
+    const captured = captureHandlers(server, client, config, credentials);
 
     registerDispatchTool(server, captured, {
         name: 'flow_read',
@@ -179,5 +196,18 @@ export const registerDispatchTools = (server: McpServer, client: FlowApiClient, 
         paramHint: 'Parameters for the action (e.g. { productId } for credit_purchase).',
         readOnly: false,
         actions: CREDIT_DO_ACTIONS,
+    });
+
+    registerDispatchTool(server, captured, {
+        name: 'auth',
+        title: 'Eureka Sign-In',
+        description:
+            'Eureka authentication — log in, check status, or log out. ' +
+            'Call { action: "login" } when any tool reports an auth_required error or the user asks to ' +
+            'log in/connect: it opens a browser for Google sign-in and stores an API key (tell the user to ' +
+            'finish sign-in in the browser window). Call with { action, params }. Actions:',
+        paramHint: 'No parameters needed for any auth action.',
+        readOnly: false,
+        actions: AUTH_ACTIONS,
     });
 };

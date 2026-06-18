@@ -19,9 +19,13 @@ export const createServer = (): { run: () => Promise<void> } => {
             instructions:
                 'Eureka Flow MCP server. Auth: a single FLOW_API_KEY (x-api-key) unlocks both flows and credits ' +
                 '(flow.eureka.codes + billing.eureka.codes). ' +
-                'Four tools, split by domain × access: flow_read (read-only flows/nodes/blocks/runs), ' +
+                'Five tools: flow_read (read-only flows/nodes/blocks/runs), ' +
                 'flow_do (create/run/edit flows + nodes/edges), credit_read (read-only credits), ' +
-                'credit_do (purchase credits). Each takes { action, params } — pick the action from the tool description. ' +
+                'credit_do (purchase credits), and auth (login/status/logout). ' +
+                'Each takes { action, params } — pick the action from the tool description. ' +
+                'AUTH: if any tool returns an error with code "auth_required" (or the user asks to log in), call ' +
+                'auth{action:"login"} — it opens a browser for Google sign-in and stores the API key; tell the user ' +
+                'to finish sign-in in that browser window. Then retry the original action. ' +
                 'Typical workflow: ' +
                 '0) flow_read{action:"profile_get"} → verify your API key + AI provider config (required for execution), ' +
                 '1) flow_read{action:"block_list"} → discover block types, ' +
@@ -37,7 +41,7 @@ export const createServer = (): { run: () => Promise<void> } => {
         },
     );
 
-    registerDispatchTools(server, client, config);
+    registerDispatchTools(server, client, config, credentials);
 
     const run = async () => {
         const transport = new StdioServerTransport();

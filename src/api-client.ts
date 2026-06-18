@@ -222,6 +222,9 @@ export class FlowApiClient {
     // --- Error helpers ---
 
     private normalizeError(error: AxiosError): FlowApiError {
+        // A request interceptor (e.g. the auth_required guard) can reject with a FlowApiError already;
+        // pass it through untouched instead of re-wrapping it as a generic api/network error.
+        if (error instanceof FlowApiError) return error;
         if (
             error.code === 'ECONNABORTED' ||
             error.code === 'ETIMEDOUT' ||

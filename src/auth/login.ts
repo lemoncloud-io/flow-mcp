@@ -1,0 +1,149 @@
+import http from 'node:http';
+import { logger } from '../logger';
+import { openBrowser } from './open-browser';
+import { createNodeWebCore, type WebCore } from './web-core';
+import { resolveAuthEndpoints } from './endpoints';
+import type { FlowApiConfig } from '../config';
+
+const LOGIN_TIMEOUT = 120_000;
+
+export interface LoginResult {
+    apiKey: string;
+    uid?: string;
+    sid?: string;
+}
+
+interface KeyView {
+    id: string;
+    apiKey?: string;
+    name?: string;
+    hidden?: boolean;
+    invalid?: boolean;
+}
+
+type ProgressFn = (msg: string) => void;
+
+const PAGE = (title: string, body: string): string =>
+    `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head>` +
+    `<body style="font-family:system-ui;text-align:center;padding:3rem"><h2>${title}</h2><p>${body}</p></body></html>`;
+
+const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+const buildAuthorizeUrl = (socialOAuthUrl: string, redirectUri: string): string => {
+    const state = encodeURIComponent(JSON.stringify({ from: 'flow-mcp' }));
+    return `${socialOAuthUrl}/oauth/google/authorize?redirect=${encodeURIComponent(redirectUri)}&state=${state}`;
+};
+
+/** Start a single-use loopback server on a random port; resolves the auth code from /cb. */
+const startCallbackServer = (): Promise<{ server: http.Server; port: number; code: Promise<string> }> =>
+    new Promise((resolve, reject) => {
+        let resolveCode: (c: string) => void = () => {};
+        let rejectCode: (e: Error) => void = () => {};
+        const code = new Promise<string>((res, rej) => {
+            resolveCode = res;
+            rejectCode = rej;
+        });
+        const timer = setTimeout(() => rejectCode(new Error('Login timed out after 2 minutes.')), LOGIN_TIMEOUT);
+
+        const server = http.createServer((req, res) => {
+            const url = new URL(req.url ?? '', 'http://127.0.0.1');
+            if (url.pathname !== '/cb') {
+                res.writeHead(404).end();
+                return;
+            }
+            clearTimeout(timer);
+            const authCode = url.searchParams.get('code');
+            if (!authCode) {
+                res.writeHead(400, { 'Content-Type': 'text/html' }).end(
+                    PAGE('Sign-in failed', 'No code returned. Try again.'),
+                );
+                rejectCode(new Error('No authorization code returned from the OAuth callback.'));
+                return;
+            }
+            res.writeHead(200, { 'Content-Type': 'text/html' }).end(
+                PAGE('Signed in ✓', 'You can close this tab and return to your assistant.'),
+            );
+            resolveCode(authCode);
+        });
+
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', () => {
+            const addr = server.address();
+            if (addr && typeof addr === 'object') resolve({ server, port: addr.port, code });
+            else reject(new Error('Failed to bind the loopback callback server.'));
+        });
+    });
+
+/** Exchange the authorization code for AWS credentials stored inside the webCore instance. */
+const exchangeCodeForCreds = async (webCore: WebCore, oAuthEndpoint: string, code: string): Promise<void> => {
+    const { data } = await webCore
+        .buildSignedRequest({ method: 'POST', baseURL: `${oAuthEndpoint}/oauth/google/token` })
+        .setBody({ code })
+        .execute<{ Token: unknown }>();
+    await webCore.buildCredentialsByToken((data as { Token: unknown }).Token as never);
+};
+
+/** Reuse an existing valid ec- key, else mint a fresh one (SigV4-signed via webCore). */
+const mintApiKey = async (webCore: WebCore, openApiEndpoint: string): Promise<string> => {
+    try {
+        const { data } = await webCore
+            .buildSignedRequest({ method: 'GET', baseURL: `${openApiEndpoint}/_keys/0/list` })
+            .setParams({ view: 'user' })
+            .execute<{ list: KeyView[] }>();
+        const valid = data.list?.find(k => !k.invalid && !k.hidden && k.apiKey);
+        if (valid?.apiKey) return valid.apiKey;
+    } catch {
+        // Listing failed — fall through and create a new key.
+    }
+
+    const { data: created } = await webCore
+        .buildSignedRequest({ method: 'POST', baseURL: `${openApiEndpoint}/_keys/0` })
+        .setParams({ mocks: false })
+        .setBody({ name: 'flow-mcp' })
+        .execute<KeyView>();
+    if (!created.apiKey) throw new Error('Key creation returned no apiKey.');
+    return created.apiKey;
+};
+
+/** Poll the flows API until the new key is active (it propagates a few seconds after creation). */
+const pollPropagation = async (apiUrl: string, apiKey: string, onProgress?: ProgressFn): Promise<void> => {
+    const url = `${apiUrl.replace(/\/+$/, '')}/_api_/flows/0/profile`;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+            const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
+            if (res.ok) return;
+        } catch {
+            // Network hiccup — retry.
+        }
+        onProgress?.(`Activating key… (${attempt}/5)`);
+        await delay(3000);
+    }
+};
+
+/**
+ * Run the full browser-login flow: open a Google sign-in in the browser, capture the code on a
+ * loopback callback, exchange it for credentials, and mint a durable ec- API key.
+ */
+export const runBrowserLogin = async (config: FlowApiConfig, onProgress?: ProgressFn): Promise<LoginResult> => {
+    const ep = resolveAuthEndpoints(config);
+    const { server, port, code } = await startCallbackServer();
+    try {
+        const redirectUri = `http://127.0.0.1:${port}/cb`;
+        onProgress?.('Opening your browser for Google sign-in…');
+        await openBrowser(buildAuthorizeUrl(ep.socialOAuthUrl, redirectUri));
+        onProgress?.('Waiting for sign-in to finish (up to 2 minutes)…');
+
+        const authCode = await code;
+        onProgress?.('Signed in. Provisioning your API key…');
+
+        const webCore = createNodeWebCore({ project: ep.project, oAuthEndpoint: ep.oAuthEndpoint, region: ep.region });
+        await exchangeCodeForCreds(webCore, ep.oAuthEndpoint, authCode);
+        const apiKey = await mintApiKey(webCore, ep.openApiEndpoint);
+        await pollPropagation(ep.apiUrl, apiKey, onProgress);
+
+        logger.info('Browser login complete; API key minted.');
+        return { apiKey };
+    } finally {
+        server.close();
+    }
+};
