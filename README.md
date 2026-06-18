@@ -36,6 +36,7 @@ Just ask in natural language:
 
 | What you want | Say this to Claude |
 |---------------|-------------------|
+| Sign in (no key to copy) | "Log in to Eureka" |
 | List workflows | "Show my flows" |
 | Create a workflow | "Create a flow: text input → buffer → preview" |
 | Run a workflow | "Run flow 1004897" |
@@ -75,34 +76,31 @@ No code required. No tool names to remember. Just ask in natural language.
 npm install -g @lemoncloud/flow-mcp
 ```
 
-**2. Get an API key** — [flow.eureka.codes](https://flow.eureka.codes) → sign in with Google → **Create Key** → **Copy** (`ec-…`, shown once).
-
-**3. Add to your client's MCP config.** Claude Desktop file: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**2. Add to your client's MCP config** — no API key needed. Claude Desktop file: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "flow-mcp": {
       "command": "npx",
-      "args": ["-y", "@lemoncloud/flow-mcp"],
-      "env": {
-        "FLOW_API_KEY": "ec-your-key"
-      }
+      "args": ["-y", "@lemoncloud/flow-mcp"]
     }
   }
 }
 ```
 
 - **Cursor / Windsurf / VS Code (Continue/Cline):** add the same `mcpServers` block to the IDE's MCP settings.
-- **Claude Code:** `claude mcp add flow-mcp -e FLOW_API_KEY=ec-your-key -- npx -y @lemoncloud/flow-mcp`
+- **Claude Code:** `claude mcp add flow-mcp -- npx -y @lemoncloud/flow-mcp`
 
-**4. Restart** your client and say **"Show my flows"**.
+**3. Restart** your client and say **"Log in to Eureka"** — a browser opens for Google sign-in and your key is provisioned automatically. Then try **"Show my flows"**.
 
-**Environment variables** — only `FLOW_API_KEY` is required; the rest have sensible defaults:
+> Prefer a fixed key? Get one at [flow.eureka.codes](https://flow.eureka.codes) (sign in → **Create Key** → **Copy**) and add `"env": { "FLOW_API_KEY": "ec-…" }` to the config above instead of logging in.
+
+**Environment variables** — all optional; `FLOW_API_KEY` is only needed if you skip the in-chat login:
 
 | Variable | Required | Default | Description |
 |----------|:--------:|---------|-------------|
-| `FLOW_API_KEY` | Yes | — | API authentication key |
+| `FLOW_API_KEY` | | — | API key (optional — the `auth` tool mints one via browser login) |
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API server URL |
 | `FLOW_API_TIMEOUT` | | `30000` | Request timeout (ms) |
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket URL for real-time execution monitoring |

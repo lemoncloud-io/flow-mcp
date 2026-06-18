@@ -36,6 +36,7 @@ AI에게 이렇게 말하면 됩니다:
 
 | 하고 싶은 일 | Claude에게 이렇게 말하세요 |
 |-------------|------------------------|
+| 로그인 (복붙할 키 없음) | "Eureka 로그인해줘" |
 | 워크플로우 목록 보기 | "내 flow 목록 보여줘" |
 | 새 워크플로우 만들기 | "텍스트 입력 → 버퍼 → 미리보기 flow 만들어줘" |
 | 워크플로우 실행 | "1004897 flow 실행해봐" |
@@ -75,34 +76,31 @@ AI에게 이렇게 말하면 됩니다:
 npm install -g @lemoncloud/flow-mcp
 ```
 
-**2. API 키 발급** — [flow.eureka.codes](https://flow.eureka.codes) → Google 로그인 → **Create Key** → **Copy** (`ec-…`, 한 번만 표시)
-
-**3. 클라이언트 MCP 설정에 추가.** Claude Desktop 파일: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**2. 클라이언트 MCP 설정에 추가** — API 키 불필요. Claude Desktop 파일: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "flow-mcp": {
       "command": "npx",
-      "args": ["-y", "@lemoncloud/flow-mcp"],
-      "env": {
-        "FLOW_API_KEY": "ec-발급받은-키"
-      }
+      "args": ["-y", "@lemoncloud/flow-mcp"]
     }
   }
 }
 ```
 
 - **Cursor / Windsurf / VS Code (Continue/Cline):** IDE의 MCP 설정에 동일한 `mcpServers` 블록 추가.
-- **Claude Code:** `claude mcp add flow-mcp -e FLOW_API_KEY=ec-발급받은-키 -- npx -y @lemoncloud/flow-mcp`
+- **Claude Code:** `claude mcp add flow-mcp -- npx -y @lemoncloud/flow-mcp`
 
-**4. 재시작** 후 **"내 flow 목록 보여줘"** 라고 말해보세요.
+**3. 재시작** 후 **"Eureka 로그인해줘"** — 브라우저가 열려 구글 로그인하면 키가 자동 발급됩니다. 이어서 **"내 flow 목록 보여줘"**.
 
-**환경변수** — `FLOW_API_KEY`만 필수, 나머지는 기본값 있음:
+> 고정 키를 쓰고 싶으면? [flow.eureka.codes](https://flow.eureka.codes)에서 발급(로그인 → **Create Key** → **Copy**) 후 위 설정에 `"env": { "FLOW_API_KEY": "ec-…" }` 추가하면 로그인 없이 동작.
+
+**환경변수** — 전부 선택사항. `FLOW_API_KEY`는 챗 로그인을 건너뛸 때만 필요:
 
 | 환경변수 | 필수 | 기본값 | 설명 |
 |---------|:---:|--------|------|
-| `FLOW_API_KEY` | O | — | API 인증 키 |
+| `FLOW_API_KEY` | | — | API 키 (선택 — `auth` 툴이 브라우저 로그인으로 발급) |
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API 서버 주소 |
 | `FLOW_API_TIMEOUT` | | `30000` | API 요청 타임아웃 (ms) |
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket 주소 (실시간 진행상황 모니터링) |
