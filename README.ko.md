@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <b><a href="https://flow.eureka.codes">Eureka Flow</a>를 AI에서 바로 사용할 수 있게 해주는 MCP 서버</b><br/>
+  <b><a href="https://flow.eureka.codes">Eureka Flow</a>를 AI에서 바로 쓸 수 있는 MCP 서버</b><br/>
   자연어로 워크플로우를 만들고, 실행하고, 결과를 확인하세요.
 </p>
 
@@ -28,15 +28,15 @@
   </picture>
 </p>
 
-## 이런 걸 할 수 있어요
+## 이런 게 됩니다
 
-**Claude Desktop**, **Cursor**, **Windsurf**, **VS Code (Continue/Cline)**, **Claude Code** 등 MCP를 지원하는 모든 AI 클라이언트에서 사용 가능합니다.
+**Claude Desktop**, **Cursor**, **Windsurf**, **VS Code (Continue/Cline)**, **Claude Code** 등 MCP를 지원하는 AI 클라이언트라면 어디서든 쓸 수 있습니다.
 
-AI에게 이렇게 말하면 됩니다:
+그냥 말하면 됩니다:
 
-| 하고 싶은 일 | Claude에게 이렇게 말하세요 |
-|-------------|------------------------|
-| 로그인 (복붙할 키 없음) | "Eureka 로그인해줘" |
+| 하고 싶은 일 | 이렇게 말하세요 |
+|-------------|----------------|
+| 로그인 (키 복붙 없음) | "Eureka 로그인해줘" |
 | 워크플로우 목록 보기 | "내 flow 목록 보여줘" |
 | 새 워크플로우 만들기 | "텍스트 입력 → 버퍼 → 미리보기 flow 만들어줘" |
 | 워크플로우 실행 | "1004897 flow 실행해봐" |
@@ -47,23 +47,23 @@ AI에게 이렇게 말하면 됩니다:
 | 연결 | "입력 노드와 버퍼 노드를 연결해줘" |
 | 삭제 | "연결 안 된 노드 정리해줘" |
 
-코드를 몰라도, 도구 이름을 몰라도 됩니다. 자연어로 요청하면 Claude가 알아서 처리합니다.
+코드도, 도구 이름도 몰라도 됩니다. 자연어로 요청하면 Claude가 알아서 처리합니다.
 
 ## 시작하기
 
-> **준비물:** [**Claude Desktop**](https://claude.ai/download) 앱 설치, 그리고 무료 Eureka 계정(Google 로그인만 하면 됨 — 별도 가입 양식 없음). Claude Desktop에 Node.js 런타임이 내장돼 있어 추가로 설치할 건 없습니다.
+> **준비물:** [**Claude Desktop**](https://claude.ai/download) 설치, 무료 Eureka 계정(Google 로그인만 하면 됨 — 별도 가입 양식 없음). Claude Desktop에 Node.js 런타임이 내장돼 있어 따로 설치할 건 없습니다.
 
 ### 🚀 원클릭 설치 — Claude Desktop (추천, 터미널 불필요)
 
-1. **확장 파일 다운로드.** [**Releases 페이지**](https://github.com/lemoncloud-io/flow-mcp/releases/latest)에서 **Assets** 항목을 열고 **`flow-mcp.mcpb`** 를 다운로드. *("Source code" 파일들은 무시 — 필요 없습니다.)*
-2. **설치.** **`flow-mcp.mcpb`** 더블클릭 → Claude Desktop에 **설치 창**이 열림 → **API 키 칸은 비워두고**(다음 단계에서 챗으로 로그인) **Install** 클릭.
-   - *Mac이 "확인되지 않은 개발자" 경고?* 파일 우클릭 → **열기** → **열기**. 다운로드 파일에선 정상입니다.
-   - *설치 창이 안 뜨면?* Claude Desktop → **설정 → 확장(Extensions)** 에서 파일을 끌어다 놓으세요.
-3. **로그인 — 복붙할 키 없음.** Claude에게 그냥 **"Eureka 로그인해줘"**. **구글 로그인** 브라우저 창이 열립니다 — 거기서 로그인만 끝내면 Claude가 API 키를 자동 발급·저장합니다. *(직접 키를 넣고 싶으면? [flow.eureka.codes](https://flow.eureka.codes) → 로그인 → Create Key → Copy 한 뒤 2단계의 API 키 칸에 붙여넣으세요.)*
-4. **작동 확인.** Claude에게 *"내 flow 목록 보여줘"*. 뭐라도 답하면 — *"flow가 없습니다"* 라고 해도 — 연결 성공! 🎉 이어서 *"플로우 만들어줘"* 또는 *"내 크레딧 잔액 확인해줘"*.
-   - *빨간 오류나 "server disconnected"가 보이면?* **설정 → 확장(Extensions)** 에서 flow-mcp가 켜져 있는지 확인하고, Claude에게 다시 *"로그인해줘"* 하세요.
+1. **확장 파일 다운로드.** [**Releases 페이지**](https://github.com/lemoncloud-io/flow-mcp/releases/latest)에서 **Assets**를 열고 **`flow-mcp.mcpb`** 다운로드. *("Source code" 파일은 무시 — 필요 없습니다.)*
+2. **설치.** **`flow-mcp.mcpb`** 더블클릭 → Claude Desktop **설치 창**이 열림 → **API 키 칸은 비워두고**(다음 단계에서 챗으로 로그인) **Install** 클릭.
+   - *Mac이 "확인되지 않은 개발자" 경고?* 파일 우클릭 → **열기** → **열기**. 다운로드한 파일에서는 정상입니다.
+   - *설치 창이 안 뜨면?* Claude Desktop → **설정 → 확장(Extensions)** 에서 파일을 드래그하세요.
+3. **로그인 — 키 복붙 없음.** Claude에게 **"Eureka 로그인해줘"** 라고 하면 구글 로그인 브라우저 창이 열립니다. 로그인만 완료하면 Claude가 API 키를 자동 발급·저장합니다. *(직접 키를 쓰고 싶다면 [flow.eureka.codes](https://flow.eureka.codes) → 로그인 → Create Key → Copy 후 2단계의 API 키 칸에 붙여넣으세요.)*
+4. **작동 확인.** Claude에게 *"내 flow 목록 보여줘"* — *"flow가 없습니다"* 라도 뜨면 연결 성공! 🎉 이어서 *"플로우 만들어줘"* 또는 *"내 크레딧 잔액 확인해줘"*.
+   - *빨간 오류나 "server disconnected"가 보이면?* **설정 → 확장(Extensions)** 에서 flow-mcp가 켜져 있는지 확인하고 Claude에게 다시 *"로그인해줘"* 해보세요.
 
-> 로그인 한 번이면 **플로우 + 크레딧(빌링)** 모두 사용 가능. 복붙할 키도, 편집할 설정 파일도 없습니다.
+> 로그인 한 번으로 **플로우 + 크레딧(빌링)** 모두 사용 가능. 키 복붙도, 설정 파일 편집도 없습니다.
 
 ### 다른 클라이언트 (Cursor · Windsurf · VS Code · Claude Code)
 
@@ -76,7 +76,7 @@ AI에게 이렇게 말하면 됩니다:
 npm install -g @lemoncloud/flow-mcp
 ```
 
-**2. 클라이언트 MCP 설정에 추가** — API 키 불필요. Claude Desktop 파일: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**2. 클라이언트 MCP 설정에 추가** — API 키 없어도 됩니다. Claude Desktop 설정 파일: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
@@ -92,11 +92,11 @@ npm install -g @lemoncloud/flow-mcp
 - **Cursor / Windsurf / VS Code (Continue/Cline):** IDE의 MCP 설정에 동일한 `mcpServers` 블록 추가.
 - **Claude Code:** `claude mcp add flow-mcp -- npx -y @lemoncloud/flow-mcp`
 
-**3. 재시작** 후 **"Eureka 로그인해줘"** — 브라우저가 열려 구글 로그인하면 키가 자동 발급됩니다. 이어서 **"내 flow 목록 보여줘"**.
+**3. 재시작** 후 **"Eureka 로그인해줘"** — 브라우저 구글 로그인으로 키가 자동 발급됩니다. 이어서 **"내 flow 목록 보여줘"**.
 
-> 고정 키를 쓰고 싶으면? [flow.eureka.codes](https://flow.eureka.codes)에서 발급(로그인 → **Create Key** → **Copy**) 후 위 설정에 `"env": { "FLOW_API_KEY": "ec-…" }` 추가하면 로그인 없이 동작.
+> 고정 키를 쓰고 싶다면? [flow.eureka.codes](https://flow.eureka.codes)에서 발급(로그인 → **Create Key** → **Copy**) 후 위 설정에 `"env": { "FLOW_API_KEY": "ec-…" }` 를 추가하면 로그인 없이 바로 동작합니다.
 
-**환경변수** — 전부 선택사항. `FLOW_API_KEY`는 챗 로그인을 건너뛸 때만 필요:
+**환경변수** — 모두 선택사항. `FLOW_API_KEY`는 챗 로그인을 건너뛸 때만 필요합니다:
 
 | 환경변수 | 필수 | 기본값 | 설명 |
 |---------|:---:|--------|------|
@@ -150,7 +150,7 @@ npm install -g @lemoncloud/flow-mcp
 
 ### 크레딧 관리
 
-> **처음 충전하나요?** 먼저 **[billing.eureka.codes](https://billing.eureka.codes)** 에서 카드를 등록하세요. 잔액·팩·내역은 카드 없이도 되지만, 결제에는 등록된 카드가 필요합니다.
+> **처음 충전하시나요?** 먼저 **[billing.eureka.codes](https://billing.eureka.codes)** 에서 카드를 등록하세요. 잔액·팩·내역은 카드 없이도 조회되지만, 결제에는 등록된 카드가 필요합니다.
 
 ```
 "내 크레딧 잔액 확인해줘"
@@ -175,7 +175,7 @@ npm install -g @lemoncloud/flow-mcp
 
 ## 5개 도구, 31개 액션
 
-flow-mcp는 도구가 **5개**뿐 — 권한 승인을 31번이 아니라 몇 번만 하면 됩니다. 도메인(flow / credit) × 접근(**read** 읽기 / **do** 쓰기)으로 나뉘고, 로그인용 **auth** 도구가 있습니다. 읽기 도구는 read-only로 표시되고 ⚠️ 변경·결제는 `*_do` 도구에만 모여 있습니다. 이름으로 직접 부를 일 없이, 그냥 Claude에게 말하면("로그인", "플로우 공개해줘", "크레딧 확인") 알맞은 액션을 자동 선택합니다.
+flow-mcp는 도구가 **5개**뿐입니다 — 권한 승인을 31번이 아니라 몇 번만 하면 됩니다. 도메인(flow / credit) × 접근(**read** 읽기 / **do** 쓰기)으로 나뉘고, 로그인용 **auth** 도구가 별도로 있습니다. 읽기 도구는 read-only로 표시되며, ⚠️ 변경·결제는 `*_do` 도구에만 모여 있습니다. 도구 이름을 직접 부를 일은 없습니다 — Claude에게 그냥 말하면("로그인", "플로우 공개해줘", "크레딧 확인") 알맞은 액션을 자동으로 선택합니다.
 
 ### `flow_read` — 플로우 읽기 (read-only)
 
@@ -202,7 +202,7 @@ flow-mcp는 도구가 **5개**뿐 — 권한 승인을 31번이 아니라 몇 �
 `{ action, params }` · 액션:
 `login` · `status` · `logout`
 
-> `login`은 구글 로그인 브라우저를 열어 API 키를 자동 발급·저장합니다 — 복붙 없음. 사용하는 도구마다 **"Always allow" 한 번**씩이면 끝. 읽기 도구 2개는 read-only라 안심하고 허용 가능, 무언가를 바꾸거나 카드를 결제하는 건 `*_do` 도구뿐입니다.
+> `login`은 구글 로그인 브라우저를 열어 API 키를 자동 발급·저장합니다 — 복붙 불필요. 도구마다 **"Always allow" 한 번**씩이면 끝. 읽기 도구 2개는 read-only라 부담 없이 허용할 수 있고, 데이터를 변경하거나 카드를 결제하는 건 `*_do` 도구뿐입니다.
 
 ---
 
