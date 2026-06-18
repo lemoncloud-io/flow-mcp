@@ -31,8 +31,13 @@ export const registerAuthTools = (
         async () => {
             try {
                 const result = await runBrowserLogin(config, msg => mcpLog(server, 'info', msg));
+                // Save regardless of activation so a slightly-delayed key is still picked up by later calls.
                 credentials.save(result.apiKey, { uid: result.uid, sid: result.sid });
-                return toolResult({ message: 'Signed in.', ...credentials.status() });
+                const message = result.activated
+                    ? 'Signed in and ready.'
+                    : 'Signed in. Your key is still activating (this can take a minute) — if the next request ' +
+                      'fails with auth, just try it again shortly.';
+                return toolResult({ message, activated: result.activated, ...credentials.status() });
             } catch (e) {
                 return toolError(e);
             }

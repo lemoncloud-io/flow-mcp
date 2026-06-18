@@ -6,9 +6,14 @@ import { resolveAuthEndpoints } from './endpoints';
 import type { FlowApiConfig } from '../config';
 
 const LOGIN_TIMEOUT = 300_000;
+// A freshly minted key takes a short while to become active on the flows API. Poll until it works.
+const ACTIVATION_INTERVAL = 4_000;
+const ACTIVATION_MAX_MS = Number(process.env.EUREKA_KEY_ACTIVATION_TIMEOUT_MS) || 180_000;
 
 export interface LoginResult {
     apiKey: string;
+    /** Whether the minted key was confirmed active on the flows API before returning. */
+    activated: boolean;
     uid?: string;
     sid?: string;
 }
@@ -123,19 +128,30 @@ const mintApiKey = async (webCore: WebCore, openApiEndpoint: string): Promise<st
     }
 };
 
-/** Poll the flows API until the new key is active (it propagates a few seconds after creation). */
-const pollPropagation = async (apiUrl: string, apiKey: string, onProgress?: ProgressFn): Promise<void> => {
+/**
+ * Poll the flows API until the freshly minted key is accepted (HTTP 200). A new key is not valid on
+ * the flows API immediately — it propagates within a few minutes. Returns true once active, or false
+ * if it never activates within ACTIVATION_MAX_MS (the key is still saved; the next call may succeed).
+ */
+const pollUntilActive = async (apiUrl: string, apiKey: string, onProgress?: ProgressFn): Promise<boolean> => {
     const url = `${apiUrl.replace(/\/+$/, '')}/_api_/flows/0/profile`;
-    for (let attempt = 1; attempt <= 5; attempt++) {
+    const maxAttempts = Math.max(1, Math.ceil(ACTIVATION_MAX_MS / ACTIVATION_INTERVAL));
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
-            if (res.ok) return;
+            if (res.ok) {
+                onProgress?.('Your key is active.');
+                return true;
+            }
         } catch {
             // Network hiccup — retry.
         }
-        onProgress?.(`Activating key… (${attempt}/5)`);
-        await delay(3000);
+        if (attempt < maxAttempts) {
+            onProgress?.(`Activating your key… (${attempt}/${maxAttempts})`);
+            await delay(ACTIVATION_INTERVAL);
+        }
     }
+    return false;
 };
 
 /**
@@ -157,10 +173,10 @@ export const runBrowserLogin = async (config: FlowApiConfig, onProgress?: Progre
         const webCore = createNodeWebCore({ project: ep.project, oAuthEndpoint: ep.oAuthEndpoint, region: ep.region });
         await exchangeCodeForCreds(webCore, ep.oAuthEndpoint, authCode);
         const apiKey = await mintApiKey(webCore, ep.openApiEndpoint);
-        await pollPropagation(ep.apiUrl, apiKey, onProgress);
+        const activated = await pollUntilActive(ep.apiUrl, apiKey, onProgress);
 
-        logger.info('Browser login complete; API key minted.');
-        return { apiKey };
+        logger.info(`Browser login complete; API key minted (activated=${activated}).`);
+        return { apiKey, activated };
     } finally {
         server.close();
     }
