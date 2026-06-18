@@ -102,12 +102,15 @@ const exchangeCodeForCreds = async (webCore: WebCore, oAuthEndpoint: string, cod
     }
 };
 
-/** Reuse an existing valid ec- key, else mint a fresh one (SigV4-signed via webCore). */
+/**
+ * Reuse an existing valid ec- key, else mint a fresh one (SigV4-signed via webCore).
+ * mask=0 is REQUIRED — without it the API returns the key masked (ec-dev-...***), which is unusable.
+ */
 const mintApiKey = async (webCore: WebCore, openApiEndpoint: string): Promise<string> => {
     try {
         const { data } = await webCore
             .buildSignedRequest({ method: 'GET', baseURL: `${openApiEndpoint}/_keys/0/list` })
-            .setParams({ view: 'user' })
+            .setParams({ view: 'user', mask: 0 })
             .execute<{ list: KeyView[] }>();
         const valid = data.list?.find(k => !k.invalid && !k.hidden && k.apiKey);
         if (valid?.apiKey) return valid.apiKey;
@@ -118,7 +121,7 @@ const mintApiKey = async (webCore: WebCore, openApiEndpoint: string): Promise<st
     try {
         const { data: created } = await webCore
             .buildSignedRequest({ method: 'POST', baseURL: `${openApiEndpoint}/_keys/0` })
-            .setParams({ mocks: false })
+            .setParams({ mocks: false, mask: 0 })
             .setBody({ name: 'flow-mcp' })
             .execute<KeyView>();
         if (!created.apiKey) throw new Error('Key creation returned no apiKey.');
