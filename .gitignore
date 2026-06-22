@@ -9,3 +9,4 @@ refer/
 *.mcpb
 .mcpb-build/
 .DS_Store
+.playwright-mcp/
