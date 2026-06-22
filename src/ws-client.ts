@@ -154,6 +154,17 @@ export const executeWithWs = (
         const url = `${wsUrl}?x-api-key=${encodeURIComponent(apiKey)}&info=&channels=0000`;
         const ws = new WebSocket(url);
 
+        // The server only hands out a connectionId in response to an explicit info request (this is what
+        // the web app's websocket.worker.js does on open). Without it we never get a connectionId, the
+        // run is never triggered, and every execution times out with an empty event log.
+        ws.on('open', () => {
+            try {
+                ws.send(JSON.stringify({ type: 'system', action: 'info', data: {} }));
+            } catch {
+                /* send failures surface via the error/close handlers */
+            }
+        });
+
         ws.on('error', err => {
             const safeMsg = err.message.replace(/x-api-key=[^&]+/, 'x-api-key=***');
             logger.error('WebSocket error:', safeMsg);
@@ -182,6 +193,16 @@ export const executeWithWs = (
         ws.on('message', data => {
             try {
                 const msg = JSON.parse(String(data));
+
+                // Keep-alive: the server pings; reply with pong so it doesn't drop us mid-run.
+                if (msg.action === 'ping') {
+                    try {
+                        ws.send(JSON.stringify({ type: 'system', action: 'pong', data: { timestamp: Date.now() } }));
+                    } catch {
+                        /* ignore */
+                    }
+                    return;
+                }
 
                 if (msg.action === 'info' && msg.data?.connectionId) {
                     logger.debug(`Got connectionId: ${msg.data.connectionId}`);
