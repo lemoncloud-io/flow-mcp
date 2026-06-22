@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { registerNodeTools } from '../../src/tools';
-import { makeApiClient, makeConfig, makeNodeView, makePortData, type MockApiClient } from '../helpers/factories';
+import {
+  makeApiClient,
+  makeConfig,
+  makeNode,
+  makeNodeView,
+  makePortData,
+  makeSaveFlow,
+  type MockApiClient,
+} from '../helpers/factories';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 type ToolHandler = (...args: unknown[]) => Promise<unknown>;
@@ -25,6 +33,33 @@ describe('node tool handlers', () => {
   beforeEach(() => {
     mockClient = makeApiClient();
     handlers = captureHandlers(mockClient);
+  });
+
+  describe('node_create', () => {
+    it('should add the node via upsertFlow (graph merge) and return the new node', async () => {
+      mockClient.loadFlow.mockResolvedValue(makeSaveFlow({ id: 'f-1', nodes: [makeNode({ id: 'existing' })] }));
+      mockClient.upsertFlow.mockResolvedValue(
+        makeSaveFlow({ id: 'f-1', nodes: [makeNode({ id: 'existing' }), makeNode({ id: 'new-1', type: 'input-text' })] }),
+      );
+
+      const result = await handlers.node_create({
+        flowId: 'f-1',
+        blockId: 'input-text',
+        position: { x: 0, y: 0 },
+        config: undefined,
+        customLabel: undefined,
+      });
+      const parsed = JSON.parse((result as { content: Array<{ text: string }> }).content[0].text);
+
+      // Node joins the flow graph via upsertFlow — a bare /nodes/0/upsert would orphan it.
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith(
+        'f-1',
+        expect.objectContaining({ nodes: [expect.objectContaining({ type: 'input-text' })], edges: [] }),
+      );
+      expect(mockClient.upsertNode).not.toHaveBeenCalled();
+      // Returns the newly created node (the id that was not present before).
+      expect(parsed.id).toBe('new-1');
+    });
   });
 
   describe('node_run', () => {

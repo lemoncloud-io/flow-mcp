@@ -56,14 +56,25 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
         },
         async ({ flowId, blockId, position, config: nodeConfig, customLabel }) => {
             try {
-                const result = await client.upsertNode('0', flowId, {
-                    blockId,
-                    position: position ?? { x: 400, y: 300 },
-                    config: nodeConfig ?? {},
-                    customLabel,
-                    autoExecutionEnabled: true,
+                // Add the node through the flow graph: upsertFlow MERGES and links it into the flow's
+                // node list. A bare POST /nodes/0/upsert creates an orphan node that never joins the
+                // flow, so it never shows up on load. Diff before/after to return the new node's id.
+                const before = await client.loadFlow(flowId);
+                const beforeIds = new Set((before.nodes ?? []).map(n => n.id).filter(Boolean));
+                const result = await client.upsertFlow(flowId, {
+                    nodes: [
+                        filterDefined({
+                            type: blockId,
+                            position: position ?? { x: 400, y: 300 },
+                            config: nodeConfig ?? {},
+                            customLabel,
+                            autoExecutionEnabled: true,
+                        }),
+                    ],
+                    edges: [],
                 });
-                return toolResult(result);
+                const newNode = (result.nodes ?? []).find(n => n.id && !beforeIds.has(n.id));
+                return toolResult(newNode ?? result);
             } catch (e) {
                 return toolError(e);
             }
