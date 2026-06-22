@@ -32,9 +32,10 @@ type ProgressFn = (msg: string, tick?: { current: number; total: number }) => vo
 const PAGE = (opts: { title: string; body: string; tone: 'success' | 'error' }): string => {
     const { title, body, tone } = opts;
     const ok = tone === 'success';
-    // Success keeps spinning ("provisioning…"); error shows a static cross.
+    // This tab is terminal — the assistant does the key polling. Show a static result mark,
+    // not a spinner (a perpetual loader on a "you can close this" page reads as stuck).
     const mark = ok
-        ? `<div class="ring"></div>`
+        ? `<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>`
         : `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
     return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -51,16 +52,15 @@ background:var(--bg);color:var(--fg);font-family:Outfit,system-ui,-apple-system,
 border-radius:20px;padding:40px 32px;box-shadow:0 12px 40px rgba(20,10,40,.12)}
 .badge{width:72px;height:72px;margin:0 auto 24px;border-radius:22px;display:flex;align-items:center;justify-content:center;
 background:linear-gradient(135deg,#9333ea,#7c3aed);box-shadow:0 8px 24px rgba(124,58,237,.4)}
-.ring{width:30px;height:30px;border-radius:50%;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
 h1{margin:0 0 8px;font-size:21px;font-weight:700;letter-spacing:-.02em}
 p{margin:0;font-size:14.5px;line-height:1.55;color:var(--sub);font-weight:500}
-.brand{margin-top:28px;font-size:13px;font-weight:600;color:#71717a;letter-spacing:.04em}
-.brand b{color:#8F19F6}
+.brand{margin-top:28px;font-size:13px;font-weight:600;color:var(--sub);letter-spacing:.04em}
+.brand b{color:#a855f7}
+@media(prefers-color-scheme:light){.brand b{color:#8F19F6}}
 </style></head>
 <body><div class="card"><div class="badge">${mark}</div>
 <h1>${title}</h1><p>${body}</p>
-<div class="brand"><b>Eureka</b> Flow</div></div></body></html>`;
+<div class="brand"><b>Eureka Flow</b></div></div></body></html>`;
 };
 
 const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
@@ -111,7 +111,7 @@ const startCallbackServer = (): Promise<{ server: http.Server; port: number; cod
                 PAGE({
                     tone: 'success',
                     title: 'Signed in',
-                    body: 'Provisioning your Eureka API key… You can close this tab and return to your assistant.',
+                    body: 'You can close this tab and return to your assistant — it’s finishing setting up your API key.',
                 }),
             );
             resolveCode(authCode);
