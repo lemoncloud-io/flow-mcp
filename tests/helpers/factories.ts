@@ -18,6 +18,7 @@ import { type FlowApiConfig, DEFAULT_WS_URL } from '../../src/config';
 
 export const makeConfig = (overrides?: Partial<FlowApiConfig>): FlowApiConfig => ({
   FLOW_API_URL: 'https://api.example.com',
+  FLOW_WEB_URL: 'https://flow.example.com',
   FLOW_API_KEY: 'test-key-123',
   FLOW_API_TIMEOUT: 30000,
   FLOW_WS_URL: DEFAULT_WS_URL,

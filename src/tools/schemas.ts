@@ -22,6 +22,7 @@ export const FlowListOutputSchema = z.object({
 // --- Flow Graph ---
 export const FlowGraphOutputSchema = z.object({
     flowId: z.string(),
+    url: z.optional(z.string()),
     mermaid: z.string(),
 });
 

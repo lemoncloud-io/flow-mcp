@@ -79,6 +79,7 @@ describe('flow tool handlers', () => {
       expect(parsed.total).toBe(2);
       expect(parsed.flows[0].id).toBe('f-1');
       expect(parsed.flows[0].name).toBe('Flow 1');
+      expect(parsed.flows[0].url).toBe('https://flow.example.com/flows/f-1');
     });
 
     it('should pass isPublic filter', async () => {
@@ -120,6 +121,7 @@ describe('flow tool handlers', () => {
       const parsed = JSON.parse((result as { content: Array<{ text: string }> }).content[0].text);
 
       expect(parsed.id).toBe('f-1');
+      expect(parsed.url).toBe('https://flow.example.com/flows/f-1');
     });
 
     it('should return toolError on failure', async () => {

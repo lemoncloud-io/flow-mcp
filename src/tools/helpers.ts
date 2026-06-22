@@ -23,6 +23,9 @@ export const toolError = (error: unknown) => {
     };
 };
 
+/** Build the web console link for a flow: `{base}/flows/{id}`. */
+export const flowWebUrl = (base: string, id: string): string => `${base.replace(/\/+$/, '')}/flows/${id}`;
+
 /** Extract portable node fields, stripping runtime state */
 export const stripNodeRuntime = (nodes: NodeData[]) =>
     nodes.map(n => ({ type: n.type, position: n.position, config: n.config, customLabel: n.customLabel }));

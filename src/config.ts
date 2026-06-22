@@ -6,6 +6,10 @@ export const DEFAULT_WS_URL = 'wss://wss.eureka.codes/wss-v1';
 
 const configSchema = z.object({
     FLOW_API_URL: z.url().default('https://api.eureka.codes/flw-v1').describe('Eureka Flows API base URL'),
+    FLOW_WEB_URL: z
+        .url()
+        .default('https://flow.eureka.codes')
+        .describe('Eureka Flow web console base URL — used to build shareable flow links (/flows/:id)'),
     FLOW_API_KEY: z
         // Blank/whitespace (e.g. an unfilled .mcpb config slot injects "") counts as unset, not invalid.
         .preprocess(

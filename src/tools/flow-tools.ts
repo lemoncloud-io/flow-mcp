@@ -5,7 +5,15 @@ import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured } from '../ws-client';
 import { TERMINAL_STATES } from '../types';
 import type { EdgeData } from '../types';
-import { filterDefined, makeProgressHandler, mcpLog, stripNodeRuntime, toolError, toolResult } from './helpers';
+import {
+    filterDefined,
+    flowWebUrl,
+    makeProgressHandler,
+    mcpLog,
+    stripNodeRuntime,
+    toolError,
+    toolResult,
+} from './helpers';
 import { completableFlowId } from './completions';
 import {
     PassthroughSchema,
@@ -45,6 +53,7 @@ const remapEdgesToIndices = (edges: EdgeData[], nodes: Array<{ id?: string }>) =
 
 interface RunResultOpts {
     client: FlowApiClient;
+    webBaseUrl: string;
     flowId: string;
     expectedNodeIds: string[];
     nodeStates: Map<string, string>;
@@ -57,7 +66,18 @@ interface RunResultOpts {
 
 /** Build execution result from WS states, re-fetching on error/timeout */
 const buildRunResult = async (opts: RunResultOpts) => {
-    const { client, flowId, expectedNodeIds, nodeStates, timedOut, startTime, eventLog, timeout, startNodeId } = opts;
+    const {
+        client,
+        webBaseUrl,
+        flowId,
+        expectedNodeIds,
+        nodeStates,
+        timedOut,
+        startTime,
+        eventLog,
+        timeout,
+        startNodeId,
+    } = opts;
     const hasError = [...nodeStates.values()].some(s => s === 'ERROR');
     let nodes = expectedNodeIds.map(id => ({
         id,
@@ -79,6 +99,7 @@ const buildRunResult = async (opts: RunResultOpts) => {
     const status = timedOut ? 'timeout' : hasError ? 'error' : 'completed';
     return toolResult({
         flowId,
+        url: flowWebUrl(webBaseUrl, flowId),
         ...(startNodeId && { startNodeId }),
         status,
         nodes,
@@ -92,6 +113,10 @@ const buildRunResult = async (opts: RunResultOpts) => {
 
 export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiConfig: FlowApiConfig) => {
     const flowId = completableFlowId(client);
+    const urlFor = (id: string) => flowWebUrl(apiConfig.FLOW_WEB_URL, id);
+    // Attach the web console link to a flow-shaped result so clients can surface a clickable URL.
+    const withUrl = <T extends { id?: string }>(flow: T): T | (T & { url: string }) =>
+        flow.id ? { ...flow, url: urlFor(flow.id) } : flow;
 
     server.registerTool(
         'profile_get',
@@ -144,6 +169,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     status: f.status,
                     isPublic: f.isPublic,
                     modifiedAt: f.modifiedAt,
+                    ...(f.id && { url: urlFor(f.id) }),
                 }));
                 return toolResult({ total: result.total, limit: result.limit, offset: result.offset, flows: summary });
             } catch (e) {
@@ -165,7 +191,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
         async ({ flowId }) => {
             try {
                 const flow = await client.loadFlow(flowId);
-                return toolResult(flow);
+                return toolResult(withUrl(flow));
             } catch (e) {
                 return toolError(e);
             }
@@ -210,6 +236,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 const summary = [
                     `# ${flow.name ?? flowId}`,
+                    `🔗 ${urlFor(flowId)}`,
                     '',
                     '```mermaid',
                     mermaid,
@@ -232,7 +259,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 return {
                     content: [{ type: 'text' as const, text: summary }],
-                    structuredContent: { flowId, mermaid },
+                    structuredContent: { flowId, url: urlFor(flowId), mermaid },
                 };
             } catch (e) {
                 return toolError(e);
@@ -270,7 +297,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 });
 
                 if (!edges?.length || !created.nodes?.length) {
-                    return toolResult(created);
+                    return toolResult(withUrl(created));
                 }
 
                 const realNodes = created.nodes;
@@ -288,7 +315,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     edges: resolvedEdges,
                 });
 
-                return toolResult(saved);
+                return toolResult(withUrl(saved));
             } catch (e) {
                 return toolError(e);
             }
@@ -336,7 +363,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
             try {
                 const makePublic = isPublic ?? true;
                 const result = await client.upsertFlow(flowId, { isPublic: makePublic });
-                return toolResult({ flowId, isPublic: makePublic, flow: result });
+                return toolResult({ flowId, url: urlFor(flowId), isPublic: makePublic, flow: result });
             } catch (e) {
                 return toolError(e);
             }
@@ -399,7 +426,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 const sourceEdges = source.edges ?? [];
                 if (!sourceEdges.length || !created.nodes?.length) {
-                    return toolResult(created);
+                    return toolResult(withUrl(created));
                 }
 
                 const indexEdges = remapEdgesToIndices(sourceEdges, source.nodes ?? []);
@@ -416,7 +443,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     nodes: created.nodes!,
                     edges: resolvedEdges,
                 });
-                return toolResult(saved);
+                return toolResult(withUrl(saved));
             } catch (e) {
                 return toolError(e);
             }
@@ -502,6 +529,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 return buildRunResult({
                     client,
+                    webBaseUrl: apiConfig.FLOW_WEB_URL,
                     flowId,
                     expectedNodeIds,
                     nodeStates,
@@ -569,6 +597,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 return buildRunResult({
                     client,
+                    webBaseUrl: apiConfig.FLOW_WEB_URL,
                     flowId,
                     expectedNodeIds: allNodeIds,
                     nodeStates,
