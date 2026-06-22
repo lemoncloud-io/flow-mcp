@@ -26,11 +26,42 @@ interface KeyView {
     invalid?: boolean;
 }
 
-type ProgressFn = (msg: string) => void;
+type ProgressFn = (msg: string, tick?: { current: number; total: number }) => void;
 
-const PAGE = (title: string, body: string): string =>
-    `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head>` +
-    `<body style="font-family:system-ui;text-align:center;padding:3rem"><h2>${title}</h2><p>${body}</p></body></html>`;
+/** Branded loopback callback page — Eureka Flow look (Outfit font, purple gradient mark). */
+const PAGE = (opts: { title: string; body: string; tone: 'success' | 'error' }): string => {
+    const { title, body, tone } = opts;
+    const ok = tone === 'success';
+    // Success keeps spinning ("provisioning…"); error shows a static cross.
+    const mark = ok
+        ? `<div class="ring"></div>`
+        : `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#8F19F6"><title>${title} · Eureka Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fff;--fg:#18181b;--sub:#71717a;--card:#fff;--border:#ececef}
+@media(prefers-color-scheme:dark){:root{--bg:#1f1f21;--fg:#f2f2f3;--sub:#a1a1aa;--card:#28282b;--border:#3a3a3e}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+background:var(--bg);color:var(--fg);font-family:Outfit,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.card{width:100%;max-width:380px;text-align:center;background:var(--card);border:1px solid var(--border);
+border-radius:20px;padding:40px 32px;box-shadow:0 12px 40px rgba(20,10,40,.12)}
+.badge{width:72px;height:72px;margin:0 auto 24px;border-radius:22px;display:flex;align-items:center;justify-content:center;
+background:linear-gradient(135deg,#9333ea,#7c3aed);box-shadow:0 8px 24px rgba(124,58,237,.4)}
+.ring{width:30px;height:30px;border-radius:50%;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+h1{margin:0 0 8px;font-size:21px;font-weight:700;letter-spacing:-.02em}
+p{margin:0;font-size:14.5px;line-height:1.55;color:var(--sub);font-weight:500}
+.brand{margin-top:28px;font-size:13px;font-weight:600;color:#71717a;letter-spacing:.04em}
+.brand b{color:#8F19F6}
+</style></head>
+<body><div class="card"><div class="badge">${mark}</div>
+<h1>${title}</h1><p>${body}</p>
+<div class="brand"><b>Eureka</b> Flow</div></div></body></html>`;
+};
 
 const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -67,13 +98,21 @@ const startCallbackServer = (): Promise<{ server: http.Server; port: number; cod
             const authCode = url.searchParams.get('code');
             if (!authCode) {
                 res.writeHead(400, { 'Content-Type': 'text/html' }).end(
-                    PAGE('Sign-in failed', 'No code returned. Try again.'),
+                    PAGE({
+                        tone: 'error',
+                        title: 'Sign-in failed',
+                        body: 'No authorization code was returned. Close this tab and ask your assistant to log in again.',
+                    }),
                 );
                 rejectCode(new Error('No authorization code returned from the OAuth callback.'));
                 return;
             }
             res.writeHead(200, { 'Content-Type': 'text/html' }).end(
-                PAGE('Signed in ✓', 'You can close this tab and return to your assistant.'),
+                PAGE({
+                    tone: 'success',
+                    title: 'Signed in',
+                    body: 'Provisioning your Eureka API key… You can close this tab and return to your assistant.',
+                }),
             );
             resolveCode(authCode);
         });
@@ -143,14 +182,14 @@ const pollUntilActive = async (apiUrl: string, apiKey: string, onProgress?: Prog
         try {
             const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
             if (res.ok) {
-                onProgress?.('Your key is active.');
+                onProgress?.('Your key is active.', { current: maxAttempts, total: maxAttempts });
                 return true;
             }
         } catch {
             // Network hiccup — retry.
         }
         if (attempt < maxAttempts) {
-            onProgress?.(`Activating your key… (${attempt}/${maxAttempts})`);
+            onProgress?.(`Activating your key… (${attempt}/${maxAttempts})`, { current: attempt, total: maxAttempts });
             await delay(ACTIVATION_INTERVAL);
         }
     }
