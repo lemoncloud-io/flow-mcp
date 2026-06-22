@@ -41,17 +41,21 @@ export class FlowApiClient {
         logger.info(`API base: ${this.baseUrl}${apiPath}`);
 
         // Inject the x-api-key per request so a key minted mid-session (via the auth tool) is used
-        // immediately, without restarting the server. No key yet → fail fast with auth_required.
+        // immediately, without restarting the server. No key yet → fail fast with auth_required,
+        // EXCEPT for /public/ endpoints (e.g. public flows, credit packs) which the backend serves
+        // keyless — those proceed without a key, but still send one when present.
         this.client.interceptors.request.use(requestConfig => {
             const apiKey = this.credentials.getApiKey();
-            if (!apiKey) {
+            const isPublic = (requestConfig.url ?? '').includes('/public/');
+            if (apiKey) {
+                requestConfig.headers.set('x-api-key', apiKey);
+            } else if (!isPublic) {
                 throw new FlowApiError(
                     'auth_required',
                     'Not authenticated. Ask the assistant to log in (the auth tool opens a browser for Google sign-in), ' +
                         'or set FLOW_API_KEY.',
                 );
             }
-            requestConfig.headers.set('x-api-key', apiKey);
             return requestConfig;
         });
 

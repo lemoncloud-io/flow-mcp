@@ -60,6 +60,21 @@ describe('FlowApiClient', () => {
       expect(thrown).toBeInstanceOf(FlowApiError);
       expect((thrown as FlowApiError).code).toBe('auth_required');
     });
+
+    it('should allow keyless /public/ requests without throwing', () => {
+      const client = new FlowApiClient(makeConfig(), { getApiKey: () => null } as unknown as CredentialStore);
+      const axiosInstance = (
+        client as unknown as {
+          client: { interceptors: { request: { handlers: Array<{ fulfilled: (c: unknown) => unknown }> } } };
+        }
+      ).client;
+      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
+      const set = vi.fn();
+
+      const cfg = { url: 'https://api.example.com/public/products/0/list', headers: { set } };
+      expect(() => interceptor(cfg)).not.toThrow();
+      expect(set).not.toHaveBeenCalled(); // no key → no x-api-key header, but request proceeds
+    });
   });
 
   describe('listFlows', () => {
