@@ -47,7 +47,7 @@ Just ask in natural language:
 
 | What you want | Say this to Claude |
 |---------------|-------------------|
-| Sign in (no key to copy) | "Log in to Eureka" |
+| Sign in (no key to copy) | "Log in to Flow" |
 | List workflows | "Show my flows" |
 | Create a workflow | "Create a flow: text input → buffer → preview" |
 | Run a workflow | "Run flow 1004897" |
@@ -62,7 +62,7 @@ No code required. No tool names to remember. Just ask in natural language.
 
 ## Quick Start
 
-> **You'll need:** the [**Claude Desktop**](https://claude.ai/download) app installed, and a free Eureka account (just sign in with Google — no signup form). Claude Desktop bundles its own Node.js runtime, so there's nothing else to install.
+> **You'll need:** the [**Claude Desktop**](https://claude.ai/download) app installed, and a free EurekaCodes account (just sign in with Google — no signup form). Claude Desktop bundles its own Node.js runtime, so there's nothing else to install.
 
 ### 🚀 One-Click Install — Claude Desktop (recommended, no terminal)
 
@@ -70,7 +70,7 @@ No code required. No tool names to remember. Just ask in natural language.
 2. **Install it.** Double-click **`flow-mcp.mcpb`**. Claude Desktop opens an **install window** — **leave the API Key field blank** (you'll log in from chat in the next step) and click **Install**.
    - *Mac says "unidentified developer"?* Right-click the file → **Open** → **Open**. That's normal for downloads.
    - *No install window appeared?* Open Claude Desktop → **Settings → Extensions** and drag the file in.
-3. **Log in — no key to copy.** In Claude, just say **"Log in to Eureka."** A browser window opens for **Google sign-in** — finish there, and Claude provisions and stores your API key automatically. *(Prefer to paste a key yourself? Get one at [flow.eureka.codes](https://flow.eureka.codes) → sign in → Create Key → Copy, and put it in the API Key field at step 2 instead.)*
+3. **Log in — no key to copy.** In Claude, just say **"Log in to Flow."** A browser window opens for **Google sign-in** — finish there, and Claude provisions and stores your API key automatically. *(Prefer to paste a key yourself? Get one at [flow.eureka.codes](https://flow.eureka.codes) → sign in → Create Key → Copy, and put it in the API Key field at step 2 instead.)*
 4. **Check it works.** Ask Claude *"Show my flows"*. If it answers at all — even *"you have no flows yet"* — you're connected! 🎉 Then try *"Create a flow"* or *"Check my credit balance"*.
    - *See a red error or "server disconnected" instead?* Open **Settings → Extensions** and confirm flow-mcp is enabled, then ask Claude to *"log in"* again.
 
@@ -78,7 +78,7 @@ No code required. No tool names to remember. Just ask in natural language.
 
 ### Other clients (Cursor · Windsurf · VS Code · Claude Code)
 
-**One-click:** click a badge to auto-add the `npx` config, then say **"Log in to Eureka"**:
+**One-click:** click a badge to auto-add the `npx` config, then say **"Log in to Flow"**:
 
 <p>
   <a href="https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19"><img src="https://img.shields.io/badge/Add_to-Cursor-0A0A0A?style=flat-square&logo=cursor&logoColor=white" alt="Add flow-mcp to Cursor" /></a>
@@ -112,7 +112,7 @@ npm install -g @lemoncloud/flow-mcp
 - **Cursor / Windsurf / VS Code (Continue/Cline):** add the same `mcpServers` block to the IDE's MCP settings.
 - **Claude Code:** `claude mcp add flow-mcp -- npx -y @lemoncloud/flow-mcp`
 
-**3. Restart** your client and say **"Log in to Eureka"** — a browser opens for Google sign-in and your key is provisioned automatically. Then try **"Show my flows"**.
+**3. Restart** your client and say **"Log in to Flow"** — a browser opens for Google sign-in and your key is provisioned automatically. Then try **"Show my flows"**.
 
 > Prefer a fixed key? Get one at [flow.eureka.codes](https://flow.eureka.codes) (sign in → **Create Key** → **Copy**) and add `"env": { "FLOW_API_KEY": "ec-…" }` to the config above instead of logging in.
 

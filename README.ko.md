@@ -47,7 +47,7 @@
 
 | 하고 싶은 일 | 이렇게 말하세요 |
 |-------------|----------------|
-| 로그인 (키 복붙 없음) | "Eureka 로그인해줘" |
+| 로그인 (키 복붙 없음) | "Flow 로그인해줘" |
 | 워크플로우 목록 보기 | "내 flow 목록 보여줘" |
 | 새 워크플로우 만들기 | "텍스트 입력 → 버퍼 → 미리보기 flow 만들어줘" |
 | 워크플로우 실행 | "1004897 flow 실행해봐" |
@@ -62,7 +62,7 @@
 
 ## 시작하기
 
-> **준비물:** [**Claude Desktop**](https://claude.ai/download) 설치, 무료 Eureka 계정(Google 로그인만 하면 됨 — 별도 가입 양식 없음). Claude Desktop에 Node.js 런타임이 내장돼 있어 따로 설치할 건 없습니다.
+> **준비물:** [**Claude Desktop**](https://claude.ai/download) 설치, 무료 EurekaCodes 계정(Google 로그인만 하면 됨 — 별도 가입 양식 없음). Claude Desktop에 Node.js 런타임이 내장돼 있어 따로 설치할 건 없습니다.
 
 ### 🚀 원클릭 설치 — Claude Desktop (추천, 터미널 불필요)
 
@@ -70,7 +70,7 @@
 2. **설치.** **`flow-mcp.mcpb`** 더블클릭 → Claude Desktop **설치 창**이 열림 → **API 키 칸은 비워두고**(다음 단계에서 챗으로 로그인) **Install** 클릭.
    - *Mac이 "확인되지 않은 개발자" 경고?* 파일 우클릭 → **열기** → **열기**. 다운로드한 파일에서는 정상입니다.
    - *설치 창이 안 뜨면?* Claude Desktop → **설정 → 확장(Extensions)** 에서 파일을 드래그하세요.
-3. **로그인 — 키 복붙 없음.** Claude에게 **"Eureka 로그인해줘"** 라고 하면 Google 로그인 브라우저 창이 열립니다. 로그인만 완료하면 Claude가 API 키를 자동 발급·저장합니다. *(직접 키를 쓰고 싶다면 [flow.eureka.codes](https://flow.eureka.codes) → 로그인 → Create Key → Copy 후 2단계의 API 키 칸에 붙여넣으세요.)*
+3. **로그인 — 키 복붙 없음.** Claude에게 **"Flow 로그인해줘"** 라고 하면 Google 로그인 브라우저 창이 열립니다. 로그인만 완료하면 Claude가 API 키를 자동 발급·저장합니다. *(직접 키를 쓰고 싶다면 [flow.eureka.codes](https://flow.eureka.codes) → 로그인 → Create Key → Copy 후 2단계의 API 키 칸에 붙여넣으세요.)*
 4. **작동 확인.** Claude에게 *"내 flow 목록 보여줘"* — *"flow가 없습니다"* 라도 뜨면 연결 성공! 🎉 이어서 *"플로우 만들어줘"* 또는 *"내 크레딧 잔액 확인해줘"*.
    - *빨간 오류나 "server disconnected"가 보이면?* **설정 → 확장(Extensions)** 에서 flow-mcp가 켜져 있는지 확인하고 Claude에게 다시 *"로그인해줘"* 해보세요.
 
@@ -78,7 +78,7 @@
 
 ### 다른 클라이언트 (Cursor · Windsurf · VS Code · Claude Code)
 
-**원클릭:** 배지를 누르면 `npx` 설정이 자동으로 추가됩니다. 그다음 **"Eureka 로그인해줘"** 라고 말하세요:
+**원클릭:** 배지를 누르면 `npx` 설정이 자동으로 추가됩니다. 그다음 **"Flow 로그인해줘"** 라고 말하세요:
 
 <p>
   <a href="https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19"><img src="https://img.shields.io/badge/Add_to-Cursor-0A0A0A?style=flat-square&logo=cursor&logoColor=white" alt="Cursor에 flow-mcp 추가" /></a>
@@ -112,7 +112,7 @@ npm install -g @lemoncloud/flow-mcp
 - **Cursor / Windsurf / VS Code (Continue/Cline):** IDE의 MCP 설정에 동일한 `mcpServers` 블록 추가.
 - **Claude Code:** `claude mcp add flow-mcp -- npx -y @lemoncloud/flow-mcp`
 
-**3. 재시작** 후 **"Eureka 로그인해줘"** — 브라우저 Google 로그인으로 키가 자동 발급됩니다. 이어서 **"내 flow 목록 보여줘"**.
+**3. 재시작** 후 **"Flow 로그인해줘"** — 브라우저 Google 로그인으로 키가 자동 발급됩니다. 이어서 **"내 flow 목록 보여줘"**.
 
 > 고정 키를 쓰고 싶다면? [flow.eureka.codes](https://flow.eureka.codes)에서 발급(로그인 → **Create Key** → **Copy**) 후 위 설정에 `"env": { "FLOW_API_KEY": "ec-…" }` 를 추가하면 로그인 없이 바로 동작합니다.
 
