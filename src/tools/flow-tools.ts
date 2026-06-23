@@ -26,6 +26,12 @@ import {
 } from './schemas';
 
 const NodeDataSchema = z.object({
+    id: z
+        .optional(z.string())
+        .describe('Existing node ID. Pass it to preserve the node (and its edges) across a save; omit for new nodes.'),
+    blockId: z
+        .optional(z.string())
+        .describe('Block ID (from block_list). Preserve it so the backend resolves the block.'),
     type: z.string().describe('Block process type (e.g., "input-text", "text-transform"). Get from block_list.'),
     position: z.object({ x: z.number(), y: z.number() }).describe('Canvas position'),
     config: z
@@ -399,13 +405,23 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 let result = saved;
                 if (edges.length && saved.nodes?.length) {
-                    // Resolve each edge's node refs (array index or real ID) against the saved nodes,
-                    // then re-save so every edge points at a node that actually exists.
+                    // The saved nodes come back in input order, so map each input node — by its array
+                    // index AND its pre-save ID — to the ID the backend actually assigned. Edges may
+                    // reference either form; both must land on a node that exists after the save, or
+                    // the backend stores them dangling and they vanish from the canvas.
                     const realNodes = saved.nodes;
+                    const idMap = new Map<string, string>();
+                    nodes.forEach((n, i) => {
+                        const savedId = realNodes[i]?.id;
+                        if (!savedId) return;
+                        idMap.set(String(i), savedId);
+                        if (n.id) idMap.set(n.id, savedId);
+                    });
+                    const remap = (ref: string) => idMap.get(ref) ?? ref;
                     const resolvedEdges = edges.map(e => ({
-                        sourceNodeId: resolveNodeId(e.sourceNodeId, realNodes),
+                        sourceNodeId: remap(e.sourceNodeId),
                         sourcePortId: e.sourcePortId,
-                        targetNodeId: resolveNodeId(e.targetNodeId, realNodes),
+                        targetNodeId: remap(e.targetNodeId),
                         targetPortId: e.targetPortId,
                     }));
                     result = await client.saveFlow(flowId, { nodes: realNodes, edges: resolvedEdges });

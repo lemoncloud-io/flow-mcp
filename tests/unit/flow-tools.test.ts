@@ -247,6 +247,32 @@ describe('flow tool handlers', () => {
       expect(mockClient.upsertFlow).toHaveBeenCalledWith('f-1', { name: 'Rebuilt' });
     });
 
+    it('should remap edges that reference pre-save node IDs to the reassigned IDs', async () => {
+      // The user's real failure: nodes carry their existing IDs and edges reference those same
+      // IDs, but /save reassigns them. Edges must follow the reassignment, not point at dead IDs.
+      const savedNodes = [makeNode({ id: 'new-a' }), makeNode({ id: 'new-b' })];
+      const saved = makeSaveFlow({ id: 'f-1', nodes: savedNodes, edges: [] });
+
+      mockClient.saveFlow.mockResolvedValueOnce(saved).mockResolvedValueOnce(saved);
+
+      await handlers.flow_save({
+        flowId: 'f-1',
+        name: undefined,
+        description: undefined,
+        nodes: [
+          { id: 'old-a', type: 'input-text', position: { x: 0, y: 0 } },
+          { id: 'old-b', type: 'output-text', position: { x: 200, y: 0 } },
+        ],
+        edges: [{ sourceNodeId: 'old-a', sourcePortId: 'out', targetNodeId: 'old-b', targetPortId: 'in' }],
+      });
+
+      const secondCall = mockClient.saveFlow.mock.calls[1];
+      expect(secondCall[1].edges[0].sourceNodeId).toBe('new-a');
+      expect(secondCall[1].edges[0].targetNodeId).toBe('new-b');
+      // No metadata upsert when name/description are absent.
+      expect(mockClient.upsertFlow).not.toHaveBeenCalled();
+    });
+
     it('should return toolError on failure', async () => {
       mockClient.saveFlow.mockRejectedValue(new Error('save failed'));
 
