@@ -43,6 +43,7 @@ export interface NodeData {
     customLabel?: string;
     description?: string;
     disabled?: boolean;
+    autoExecutionEnabled?: boolean;
     config?: Record<string, string>;
     input?: Record<string, string>;
     output?: Record<string, string>;

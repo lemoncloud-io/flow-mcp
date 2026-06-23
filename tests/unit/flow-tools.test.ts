@@ -134,14 +134,17 @@ describe('flow tool handlers', () => {
   });
 
   describe('flow_create', () => {
-    it('should create flow with single saveFlow call when no edges', async () => {
+    it('should save graph then set name via metadata upsert (no name in save body)', async () => {
       const created = makeSaveFlow({ id: 'new-1', nodes: [makeNode({ id: 'n-0' })] });
       mockClient.saveFlow.mockResolvedValue(created);
+      mockClient.upsertFlow.mockResolvedValue(makeSaveFlow({ id: 'new-1', name: 'New' }));
 
       await handlers.flow_create({ name: 'New', description: undefined, nodes: [{ type: 'input-text', position: { x: 0, y: 0 } }], edges: undefined });
 
+      // Save body carries only { nodes, edges } — never name/description.
       expect(mockClient.saveFlow).toHaveBeenCalledTimes(1);
-      expect(mockClient.saveFlow).toHaveBeenCalledWith('0', expect.objectContaining({ name: 'New', edges: [] }));
+      expect(mockClient.saveFlow).toHaveBeenCalledWith('0', { nodes: [{ type: 'input-text', position: { x: 0, y: 0 } }], edges: [] });
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith('new-1', { name: 'New' });
     });
 
     it('should call saveFlow twice when edges are provided (index resolution)', async () => {
@@ -152,6 +155,7 @@ describe('flow tool handlers', () => {
       mockClient.saveFlow
         .mockResolvedValueOnce(created)  // first call: create
         .mockResolvedValueOnce(saved);    // second call: save with edges
+      mockClient.upsertFlow.mockResolvedValue(makeSaveFlow({ id: 'new-1', name: 'Wired' }));
 
       const edges = [{ sourceNodeId: '0', sourcePortId: 'out', targetNodeId: '1', targetPortId: 'in' }];
       await handlers.flow_create({
@@ -170,11 +174,14 @@ describe('flow tool handlers', () => {
       expect(secondCall[0]).toBe('new-1');
       expect(secondCall[1].edges[0].sourceNodeId).toBe('real-a');
       expect(secondCall[1].edges[0].targetNodeId).toBe('real-b');
+      // Name persisted via metadata upsert, not the save body.
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith('new-1', { name: 'Wired' });
     });
 
     it('should skip second save when created.nodes is empty', async () => {
       const created = makeSaveFlow({ id: 'new-1', nodes: [] });
       mockClient.saveFlow.mockResolvedValue(created);
+      mockClient.upsertFlow.mockResolvedValue(makeSaveFlow({ id: 'new-1', name: 'Empty' }));
 
       const edges = [{ sourceNodeId: '0', sourcePortId: 'out', targetNodeId: '1', targetPortId: 'in' }];
       await handlers.flow_create({ name: 'Empty', description: undefined, nodes: [], edges });

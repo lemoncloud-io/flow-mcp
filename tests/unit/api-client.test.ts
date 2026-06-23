@@ -78,33 +78,35 @@ describe('FlowApiClient', () => {
   });
 
   describe('listFlows', () => {
-    it('should call GET /flows by default', async () => {
+    it('should call GET /flows?view=mine&page=0 by default', async () => {
       const { client, axiosInstance } = createClient();
       const data = makeListResult([makeFlow()]);
       vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data });
 
       const result = await client.listFlows();
 
-      expect(axiosInstance.get).toHaveBeenCalledWith('/flows', { params: {} });
+      expect(axiosInstance.get).toHaveBeenCalledWith('/flows', { params: { view: 'mine', page: 0 } });
       expect(result).toEqual(data);
     });
 
-    it('should call absolute /public/flows URL when isPublic is true', async () => {
+    it('should call absolute /public/flows URL with page when isPublic is true', async () => {
       const { client, axiosInstance } = createClient();
       vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makeListResult([]) });
 
-      await client.listFlows({ isPublic: true });
+      await client.listFlows({ isPublic: true, page: 2 });
 
-      expect(axiosInstance.get).toHaveBeenCalledWith('https://api.example.com/public/flows', { params: {} });
+      expect(axiosInstance.get).toHaveBeenCalledWith('https://api.example.com/public/flows', {
+        params: { page: 2 },
+      });
     });
 
-    it('should call GET /flows when isPublic is false', async () => {
+    it('should call GET /flows?view=mine when isPublic is false', async () => {
       const { client, axiosInstance } = createClient();
       vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makeListResult([]) });
 
-      await client.listFlows({ isPublic: false });
+      await client.listFlows({ isPublic: false, page: 1 });
 
-      expect(axiosInstance.get).toHaveBeenCalledWith('/flows', { params: {} });
+      expect(axiosInstance.get).toHaveBeenCalledWith('/flows', { params: { view: 'mine', page: 1 } });
     });
   });
 

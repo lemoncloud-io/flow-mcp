@@ -81,22 +81,15 @@ export class FlowApiClient {
         return data;
     }
 
-    async listFlows(opts?: {
-        isPublic?: boolean;
-        limit?: number;
-        offset?: number;
-        sort?: string;
-    }): Promise<ListResult<FlowView>> {
-        const params: Record<string, string | number> = {};
-        if (opts?.limit !== undefined) params.limit = opts.limit;
-        if (opts?.offset !== undefined) params.offset = opts.offset;
-        if (opts?.sort) params.sort = opts.sort;
-
+    async listFlows(opts?: { isPublic?: boolean; page?: number }): Promise<ListResult<FlowView>> {
+        const page = opts?.page ?? 0;
         if (opts?.isPublic) {
-            const { data } = await this.client.get(`${this.baseUrl}/public/flows`, { params });
+            // Public flows: GET /public/flows?page=N (matches the web app's listPublicFlows).
+            const { data } = await this.client.get(`${this.baseUrl}/public/flows`, { params: { page } });
             return data;
         }
-        const { data } = await this.client.get('/flows', { params });
+        // My flows: GET /flows?view=mine&page=N. Without view=mine the listing isn't scoped to the user.
+        const { data } = await this.client.get('/flows', { params: { view: 'mine', page } });
         return data;
     }
 
