@@ -392,32 +392,30 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
         },
         async ({ flowId, name, description, nodes, edges }) => {
             try {
-                // Step 1: save nodes with no edges so the backend assigns/returns the real node IDs.
-                // (POST /flows/:id/save links edges only to nodes that exist in the same payload, so
-                // sending edges that reference pre-save/index IDs would orphan them — the original bug.)
-                const saved = await client.saveFlow(flowId, { name, description, nodes, edges: [] });
+                // SaveFlowBody is { nodes, edges } only — the web app sets name/description via the
+                // metadata upsert endpoint, NOT the save body. Save the graph first (no edges so the
+                // backend assigns/returns the real node IDs), then resolve edges, then upsert metadata.
+                const saved = await client.saveFlow(flowId, { nodes, edges: [] });
 
-                if (!edges.length || !saved.nodes?.length) {
-                    return toolResult(withUrl(saved));
+                let result = saved;
+                if (edges.length && saved.nodes?.length) {
+                    // Resolve each edge's node refs (array index or real ID) against the saved nodes,
+                    // then re-save so every edge points at a node that actually exists.
+                    const realNodes = saved.nodes;
+                    const resolvedEdges = edges.map(e => ({
+                        sourceNodeId: resolveNodeId(e.sourceNodeId, realNodes),
+                        sourcePortId: e.sourcePortId,
+                        targetNodeId: resolveNodeId(e.targetNodeId, realNodes),
+                        targetPortId: e.targetPortId,
+                    }));
+                    result = await client.saveFlow(flowId, { nodes: realNodes, edges: resolvedEdges });
                 }
 
-                // Step 2: resolve each edge's node refs (array index or real ID) against the saved
-                // nodes, then re-save so every edge points at a node that actually exists.
-                const realNodes = saved.nodes;
-                const resolvedEdges = edges.map(e => ({
-                    sourceNodeId: resolveNodeId(e.sourceNodeId, realNodes),
-                    sourcePortId: e.sourcePortId,
-                    targetNodeId: resolveNodeId(e.targetNodeId, realNodes),
-                    targetPortId: e.targetPortId,
-                }));
+                if (name !== undefined || description !== undefined) {
+                    result = await client.upsertFlow(flowId, filterDefined({ name, description }));
+                }
 
-                const final = await client.saveFlow(flowId, {
-                    name,
-                    description,
-                    nodes: realNodes,
-                    edges: resolvedEdges,
-                });
-                return toolResult(withUrl(final));
+                return toolResult(withUrl(result));
             } catch (e) {
                 return toolError(e);
             }

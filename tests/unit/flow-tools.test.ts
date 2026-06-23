@@ -199,8 +199,9 @@ describe('flow tool handlers', () => {
   });
 
   describe('flow_save', () => {
-    it('should pass all fields to saveFlow', async () => {
-      mockClient.saveFlow.mockResolvedValue(makeSaveFlow());
+    it('should send graph to save body and name/description via metadata upsert', async () => {
+      mockClient.saveFlow.mockResolvedValue(makeSaveFlow({ id: 'f-1' }));
+      mockClient.upsertFlow.mockResolvedValue(makeSaveFlow({ id: 'f-1', name: 'Updated' }));
 
       await handlers.flow_save({
         flowId: 'f-1',
@@ -210,12 +211,12 @@ describe('flow tool handlers', () => {
         edges: [],
       });
 
+      // SaveFlowBody carries only { nodes, edges } — never name/description.
       expect(mockClient.saveFlow).toHaveBeenCalledWith('f-1', {
-        name: 'Updated',
-        description: 'desc',
         nodes: [{ type: 'input-text', position: { x: 0, y: 0 } }],
         edges: [],
       });
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith('f-1', { name: 'Updated', description: 'desc' });
     });
 
     it('should save edges in a second call with indices resolved to saved node IDs', async () => {
@@ -225,6 +226,7 @@ describe('flow tool handlers', () => {
       mockClient.saveFlow
         .mockResolvedValueOnce(saved) // first call: nodes only (edges stripped)
         .mockResolvedValueOnce(saved); // second call: edges with real IDs
+      mockClient.upsertFlow.mockResolvedValue(makeSaveFlow({ id: 'f-1', name: 'Rebuilt' }));
 
       await handlers.flow_save({
         flowId: 'f-1',
@@ -240,10 +242,14 @@ describe('flow tool handlers', () => {
       expect(mockClient.saveFlow).toHaveBeenCalledTimes(2);
       // First call must strip edges so the backend does not orphan them.
       expect(mockClient.saveFlow.mock.calls[0][1].edges).toEqual([]);
+      // Save body never carries name — that goes through the metadata upsert.
+      expect(mockClient.saveFlow.mock.calls[0][1].name).toBeUndefined();
       // Second call resolves index refs to the real saved node IDs.
       const secondCall = mockClient.saveFlow.mock.calls[1];
       expect(secondCall[1].edges[0].sourceNodeId).toBe('real-a');
       expect(secondCall[1].edges[0].targetNodeId).toBe('real-b');
+      // Name persisted via metadata upsert.
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith('f-1', { name: 'Rebuilt' });
     });
 
     it('should return toolError on failure', async () => {
