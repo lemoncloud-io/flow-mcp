@@ -17,6 +17,11 @@
 </p>
 
 <p align="center">
+  <b>쉽게 말하면:</b> Claude(나 다른 AI 비서)에게 워크플로우를 만들고 실행하는 능력을 더해주는 도구입니다.<br/>
+  대화만 하면 됩니다 — 코딩도, 한 번의 로그인 외 별도 설정도 필요 없습니다.
+</p>
+
+<p align="center">
   <a href="README.md">English</a>
 </p>
 
@@ -32,6 +37,12 @@
     <img src="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-dark.jpg" alt="Eureka Flow" width="100%" />
   </picture>
 </p>
+
+## 어디에 쓰나요?
+
+**Eureka Flow**는 여러 단계를 이어 붙여 하나의 *플로우*로 만드는 비주얼 도구입니다. 입력을 받아 → 처리하고(요약·변환·AI 모델 호출·API 연동) → 결과를 얻습니다. 코딩 없이요. 각 단계가 **블록**이고, 블록을 연결해 데이터를 흘려보냅니다.
+
+원래는 에디터에서 직접 손으로 플로우를 짜야 합니다. **flow-mcp**는 그 일을 AI 비서가 대신하게 해줍니다. 채팅으로 원하는 걸 말하면("내가 붙여넣는 글을 요약하는 플로우 만들어줘") AI가 플로우를 만들고, 실행하고, 결과까지 확인해 줍니다. Claude에게 Eureka Flow를 조작할 손을 쥐여준다고 보면 됩니다.
 
 ## 이런 게 됩니다
 

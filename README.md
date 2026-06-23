@@ -17,6 +17,11 @@
 </p>
 
 <p align="center">
+  <b>In plain words:</b> it gives Claude (and other AI assistants) the ability to build and run<br/>
+  automated workflows for you — just by chatting. No code, no setup beyond a one-time sign-in.
+</p>
+
+<p align="center">
   <a href="README.ko.md">한국어</a>
 </p>
 
@@ -32,6 +37,12 @@
     <img src="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-dark.jpg" alt="Eureka Flow" width="100%" />
   </picture>
 </p>
+
+## What's this for?
+
+**Eureka Flow** is a visual tool for chaining steps into a *flow*: take some input, process it (summarize, transform, call an AI model, hit an API), and get a result — without writing code. Each step is a **block**, and you connect blocks to pass data along.
+
+Normally you'd build those flows by hand in the editor. **flow-mcp** lets your AI assistant do it for you: you describe what you want in chat ("make a flow that summarizes the text I paste"), and it creates, runs, and inspects the flow on your behalf. Think of it as giving Claude hands to operate Eureka Flow.
 
 ## What You Can Do
 
