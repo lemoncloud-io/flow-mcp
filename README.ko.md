@@ -26,11 +26,6 @@
 </p>
 
 <p align="center">
-  <a href="https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19"><img src="https://img.shields.io/badge/Add_to-Cursor-0A0A0A?style=flat-square&logo=cursor&logoColor=white" alt="Cursor에 flow-mcp 추가" /></a>
-  <a href="https://insiders.vscode.dev/redirect/mcp/install?name=flow-mcp&config=%7B%22name%22%3A%22flow-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40lemoncloud%2Fflow-mcp%22%5D%7D"><img src="https://img.shields.io/badge/Install_in-VS_Code-007ACC?style=flat-square" alt="VS Code에 flow-mcp 설치" /></a>
-</p>
-
-<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-dark.jpg" />
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-light.jpg" />
@@ -83,7 +78,14 @@
 
 ### 다른 클라이언트 (Cursor · Windsurf · VS Code · Claude Code)
 
-**원클릭:** 상단의 [**Add to Cursor**](https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19) / [**Install in VS Code**](https://insiders.vscode.dev/redirect/mcp/install?name=flow-mcp&config=%7B%22name%22%3A%22flow-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40lemoncloud%2Fflow-mcp%22%5D%7D) 배지를 누르면 아래 `npx` 설정이 자동으로 추가됩니다. 그다음 **"Eureka에 로그인해줘"** 라고 말하세요. 직접 설정하려면:
+**원클릭:** 배지를 누르면 `npx` 설정이 자동으로 추가됩니다. 그다음 **"Eureka에 로그인해줘"** 라고 말하세요:
+
+<p>
+  <a href="https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19"><img src="https://img.shields.io/badge/Add_to-Cursor-0A0A0A?style=flat-square&logo=cursor&logoColor=white" alt="Cursor에 flow-mcp 추가" /></a>
+  <a href="https://insiders.vscode.dev/redirect/mcp/install?name=flow-mcp&config=%7B%22name%22%3A%22flow-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40lemoncloud%2Fflow-mcp%22%5D%7D"><img src="https://img.shields.io/badge/Install_in-VS_Code-007ACC?style=flat-square" alt="VS Code에 flow-mcp 설치" /></a>
+</p>
+
+직접 설정하려면:
 
 <details>
 <summary><b>수동 설치</b> (npm + 설정 파일)</summary>
