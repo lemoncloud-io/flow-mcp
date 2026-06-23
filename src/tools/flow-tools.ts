@@ -10,6 +10,7 @@ import {
     flowWebUrl,
     makeProgressHandler,
     mcpLog,
+    resolveOutputs,
     stripNodeRuntime,
     toolError,
     toolResult,
@@ -97,12 +98,15 @@ const buildRunResult = async (opts: RunResultOpts) => {
     }
 
     const status = timedOut ? 'timeout' : hasError ? 'error' : 'completed';
+    // Resolve the real out-port values from the run so callers see the result text directly.
+    const outputs = await resolveOutputs(client, flowId, eventLog);
     return toolResult({
         flowId,
         url: flowWebUrl(webBaseUrl, flowId),
         ...(startNodeId && { startNodeId }),
         status,
         nodes,
+        ...(outputs.length > 0 && { outputs }),
         duration: Date.now() - startTime,
         eventLog,
         ...(timedOut && {

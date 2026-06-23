@@ -168,9 +168,20 @@ export class FlowApiClient {
         return data;
     }
 
-    async getPortData(nodeId: string, portId: string, direction: string): Promise<PortData> {
-        const portRef = `${nodeId}:${portId}@${direction}`;
-        const { data } = await this.client.get(`/nodes/${encodeURIComponent(portRef)}/port`);
+    async getPortData(
+        nodeId: string,
+        portId: string,
+        direction: string,
+        opts?: { flowId?: string; runId?: string },
+    ): Promise<PortData> {
+        // Match the web app: the route param is "nodeId:portName" (no @direction); direction is a query
+        // param. Port data is run-scoped, so runId is required to read a specific run's output — without
+        // it the backend returns empty. (api/nodes.ts getPortData + useSocketHandlers.ts handlePortUpdate.)
+        const portRef = `${nodeId}:${portId}`;
+        const params: Record<string, string> = { direction };
+        if (opts?.flowId) params.flowId = opts.flowId;
+        if (opts?.runId) params.runId = opts.runId;
+        const { data } = await this.client.get(`/nodes/${encodeURIComponent(portRef)}/port`, { params });
         return data;
     }
 

@@ -116,7 +116,10 @@ describe('MCP Protocol Integration (dispatch tools)', () => {
   it('should route flow_read/node_get_port with params', async () => {
     const response = await flowReadCall(client, 'node_get_port', { nodeId: 'n-1', portId: 'out', direction: 'out' });
     expect(response.structuredContent).toBeDefined();
-    expect(mockApi.getPortData).toHaveBeenCalledWith('n-1', 'out', 'out');
+    expect(mockApi.getPortData).toHaveBeenCalledWith('n-1', 'out', 'out', {
+      flowId: undefined,
+      runId: undefined,
+    });
   });
 
   it('should route flow_do/flow_create (write)', async () => {

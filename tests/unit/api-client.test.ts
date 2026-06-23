@@ -208,14 +208,28 @@ describe('FlowApiClient', () => {
   });
 
   describe('getPortData', () => {
-    it('should encode port ref as nodeId:portId@direction', async () => {
+    it('should use nodeId:portName path with direction query (web-app format)', async () => {
       const { client, axiosInstance } = createClient();
       vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makePortData() });
 
       await client.getPortData('node-1', 'out', 'out');
 
-      const expectedRef = encodeURIComponent('node-1:out@out');
-      expect(axiosInstance.get).toHaveBeenCalledWith(`/nodes/${expectedRef}/port`);
+      const expectedRef = encodeURIComponent('node-1:out');
+      expect(axiosInstance.get).toHaveBeenCalledWith(`/nodes/${expectedRef}/port`, {
+        params: { direction: 'out' },
+      });
+    });
+
+    it('should pass runId and flowId as run-scoping query params', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makePortData() });
+
+      await client.getPortData('node-1', 'out', 'out', { flowId: 'f-1', runId: 'r-9' });
+
+      const expectedRef = encodeURIComponent('node-1:out');
+      expect(axiosInstance.get).toHaveBeenCalledWith(`/nodes/${expectedRef}/port`, {
+        params: { direction: 'out', flowId: 'f-1', runId: 'r-9' },
+      });
     });
   });
 

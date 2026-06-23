@@ -129,7 +129,10 @@ describe('node tool handlers', () => {
       const result = await handlers.node_get_port({ nodeId: 'n-1', portId: 'out', direction: 'out' });
       const parsed = JSON.parse((result as { content: Array<{ text: string }> }).content[0].text);
 
-      expect(mockClient.getPortData).toHaveBeenCalledWith('n-1', 'out', 'out');
+      expect(mockClient.getPortData).toHaveBeenCalledWith('n-1', 'out', 'out', {
+        flowId: undefined,
+        runId: undefined,
+      });
       expect(parsed.data.type).toBe('text');
     });
 

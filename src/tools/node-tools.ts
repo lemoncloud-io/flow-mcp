@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { FlowApiClient } from '../api-client';
 import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured } from '../ws-client';
-import { filterDefined, makeProgressHandler, mcpLog, toolError, toolResult } from './helpers';
+import { filterDefined, makeProgressHandler, mcpLog, resolveOutputs, toolError, toolResult } from './helpers';
 import { completableFlowId, completableBlockType } from './completions';
 import { PassthroughSchema, NodeRunOutputSchema } from './schemas';
 
@@ -128,11 +128,13 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     `Node ${nodeId} ${timedOut ? 'timed out' : status} in ${duration}ms`,
                 );
 
+                const outputs = await resolveOutputs(client, flowId, eventLog);
                 const result: Record<string, unknown> = {
                     nodeId,
                     flowId,
                     status,
                     duration,
+                    ...(outputs.length > 0 && { outputs }),
                     eventLog,
                 };
 
@@ -160,13 +162,19 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 nodeId: z.string().describe('Node ID'),
                 portId: z.string().describe('Port ID (e.g., "out", "in")'),
                 direction: z.enum(['in', 'out']).describe('Port direction'),
+                flowId: z.optional(z.string()).describe('Flow ID (recommended — scopes the lookup)'),
+                runId: z
+                    .optional(z.string())
+                    .describe(
+                        'Run ID from a flow_run/node_run eventLog. Port data is run-scoped; omit to read latest.',
+                    ),
             }),
             outputSchema: PassthroughSchema,
             annotations: { readOnlyHint: true },
         },
-        async ({ nodeId, portId, direction }) => {
+        async ({ nodeId, portId, direction, flowId, runId }) => {
             try {
-                const result = await client.getPortData(nodeId, portId, direction);
+                const result = await client.getPortData(nodeId, portId, direction, { flowId, runId });
                 return toolResult(result);
             } catch (e) {
                 return toolError(e);
