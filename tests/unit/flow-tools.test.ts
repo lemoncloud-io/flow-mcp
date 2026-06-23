@@ -90,17 +90,12 @@ describe('flow tool handlers', () => {
       expect(mockClient.listFlows).toHaveBeenCalledWith({ isPublic: true });
     });
 
-    it('should call without filter when isPublic is undefined', async () => {
+    it('should pass page through (default undefined)', async () => {
       mockClient.listFlows.mockResolvedValue(makeListResult([]));
 
-      await handlers.flow_list({ isPublic: undefined });
+      await handlers.flow_list({ isPublic: undefined, page: 3 });
 
-      expect(mockClient.listFlows).toHaveBeenCalledWith({
-        isPublic: undefined,
-        limit: undefined,
-        offset: undefined,
-        sort: undefined,
-      });
+      expect(mockClient.listFlows).toHaveBeenCalledWith({ isPublic: undefined, page: 3 });
     });
 
     it('should return toolError on API failure', async () => {
