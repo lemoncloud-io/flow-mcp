@@ -4,14 +4,23 @@ import { logger } from './logger';
 
 export const DEFAULT_WS_URL = 'wss://wss.eureka.codes/wss-v1';
 
+// An unfilled optional .mcpb config slot injects either "" or the unsubstituted "${user_config.x}"
+// literal — both must count as unset, not as a real value (else the placeholder masks a browser login).
+const blankToUndefined = (v: unknown): unknown => {
+    if (typeof v !== 'string') return v;
+    const trimmed = v.trim();
+    if (trimmed === '' || /^\$\{.*\}$/.test(trimmed)) return undefined;
+    return v;
+};
+
 const configSchema = z.object({
     FLOW_API_URL: z.url().default('https://api.eureka.codes/flw-v1').describe('Eureka Flows API base URL'),
+    FLOW_WEB_URL: z
+        .url()
+        .default('https://flow.eureka.codes')
+        .describe('Eureka Flow web console base URL — used to build shareable flow links (/flows/:id)'),
     FLOW_API_KEY: z
-        // Blank/whitespace (e.g. an unfilled .mcpb config slot injects "") counts as unset, not invalid.
-        .preprocess(
-            v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
-            z.optional(z.string().trim().min(1)),
-        )
+        .preprocess(blankToUndefined, z.optional(z.string().trim().min(1)))
         .describe('API key for authentication (optional — blank is fine; the auth tool mints one via browser login)'),
     FLOW_API_TIMEOUT: z.optional(z.coerce.number()).default(30000),
     FLOW_WS_URL: z

@@ -5,7 +5,16 @@ import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured } from '../ws-client';
 import { TERMINAL_STATES } from '../types';
 import type { EdgeData } from '../types';
-import { filterDefined, makeProgressHandler, mcpLog, stripNodeRuntime, toolError, toolResult } from './helpers';
+import {
+    filterDefined,
+    flowWebUrl,
+    makeProgressHandler,
+    mcpLog,
+    resolveOutputs,
+    stripNodeRuntime,
+    toolError,
+    toolResult,
+} from './helpers';
 import { completableFlowId } from './completions';
 import {
     PassthroughSchema,
@@ -17,6 +26,12 @@ import {
 } from './schemas';
 
 const NodeDataSchema = z.object({
+    id: z
+        .optional(z.string())
+        .describe('Existing node ID. Pass it to preserve the node (and its edges) across a save; omit for new nodes.'),
+    blockId: z
+        .optional(z.string())
+        .describe('Block ID (from block_list). Preserve it so the backend resolves the block.'),
     type: z.string().describe('Block process type (e.g., "input-text", "text-transform"). Get from block_list.'),
     position: z.object({ x: z.number(), y: z.number() }).describe('Canvas position'),
     config: z
@@ -45,6 +60,7 @@ const remapEdgesToIndices = (edges: EdgeData[], nodes: Array<{ id?: string }>) =
 
 interface RunResultOpts {
     client: FlowApiClient;
+    webBaseUrl: string;
     flowId: string;
     expectedNodeIds: string[];
     nodeStates: Map<string, string>;
@@ -57,7 +73,18 @@ interface RunResultOpts {
 
 /** Build execution result from WS states, re-fetching on error/timeout */
 const buildRunResult = async (opts: RunResultOpts) => {
-    const { client, flowId, expectedNodeIds, nodeStates, timedOut, startTime, eventLog, timeout, startNodeId } = opts;
+    const {
+        client,
+        webBaseUrl,
+        flowId,
+        expectedNodeIds,
+        nodeStates,
+        timedOut,
+        startTime,
+        eventLog,
+        timeout,
+        startNodeId,
+    } = opts;
     const hasError = [...nodeStates.values()].some(s => s === 'ERROR');
     let nodes = expectedNodeIds.map(id => ({
         id,
@@ -77,11 +104,15 @@ const buildRunResult = async (opts: RunResultOpts) => {
     }
 
     const status = timedOut ? 'timeout' : hasError ? 'error' : 'completed';
+    // Resolve the real out-port values from the run so callers see the result text directly.
+    const outputs = await resolveOutputs(client, flowId, eventLog);
     return toolResult({
         flowId,
+        url: flowWebUrl(webBaseUrl, flowId),
         ...(startNodeId && { startNodeId }),
         status,
         nodes,
+        ...(outputs.length > 0 && { outputs }),
         duration: Date.now() - startTime,
         eventLog,
         ...(timedOut && {
@@ -92,6 +123,10 @@ const buildRunResult = async (opts: RunResultOpts) => {
 
 export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiConfig: FlowApiConfig) => {
     const flowId = completableFlowId(client);
+    const urlFor = (id: string) => flowWebUrl(apiConfig.FLOW_WEB_URL, id);
+    // Attach the web console link to a flow-shaped result so clients can surface a clickable URL.
+    const withUrl = <T extends { id?: string }>(flow: T): T | (T & { url: string }) =>
+        flow.id ? { ...flow, url: urlFor(flow.id) } : flow;
 
     server.registerTool(
         'profile_get',
@@ -126,17 +161,15 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
             title: 'List Flows',
             description: "List user's flows. Use this first to see available flows before loading or running them.",
             inputSchema: z.object({
-                isPublic: z.optional(z.boolean()).describe('Filter public flows only'),
-                limit: z.optional(z.number().int().min(1).max(100)).describe('Max results per page'),
-                offset: z.optional(z.number().int().min(0)).describe('Pagination offset'),
-                sort: z.optional(z.enum(['asc', 'desc'])).describe('Sort by modified date'),
+                isPublic: z.optional(z.boolean()).describe('List public flows instead of your own'),
+                page: z.optional(z.number().int().min(0)).describe('Page number (0-based, default: 0)'),
             }),
             outputSchema: FlowListOutputSchema,
             annotations: { readOnlyHint: true },
         },
-        async ({ isPublic, limit, offset, sort }) => {
+        async ({ isPublic, page }) => {
             try {
-                const result = await client.listFlows({ isPublic, limit, offset, sort });
+                const result = await client.listFlows({ isPublic, page });
                 const summary = result.list.map(f => ({
                     id: f.id,
                     name: f.name,
@@ -144,8 +177,9 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     status: f.status,
                     isPublic: f.isPublic,
                     modifiedAt: f.modifiedAt,
+                    ...(f.id && { url: urlFor(f.id) }),
                 }));
-                return toolResult({ total: result.total, limit: result.limit, offset: result.offset, flows: summary });
+                return toolResult({ total: result.total, page: result.page ?? page ?? 0, flows: summary });
             } catch (e) {
                 return toolError(e);
             }
@@ -165,7 +199,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
         async ({ flowId }) => {
             try {
                 const flow = await client.loadFlow(flowId);
-                return toolResult(flow);
+                return toolResult(withUrl(flow));
             } catch (e) {
                 return toolError(e);
             }
@@ -210,6 +244,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 const summary = [
                     `# ${flow.name ?? flowId}`,
+                    `🔗 ${urlFor(flowId)}`,
                     '',
                     '```mermaid',
                     mermaid,
@@ -232,7 +267,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 return {
                     content: [{ type: 'text' as const, text: summary }],
-                    structuredContent: { flowId, mermaid },
+                    structuredContent: { flowId, url: urlFor(flowId), mermaid },
                 };
             } catch (e) {
                 return toolError(e);
@@ -262,33 +297,27 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
         },
         async ({ name, description, nodes, edges }) => {
             try {
-                const created = await client.saveFlow('0', {
-                    name,
-                    description,
-                    nodes: nodes ?? [],
-                    edges: [],
-                });
+                // SaveFlowBody is { nodes, edges } only — the web app sets name/description via the
+                // metadata upsert endpoint, NOT the save body. Save the graph first, then upsert metadata.
+                const created = await client.saveFlow('0', { nodes: nodes ?? [], edges: [] });
 
-                if (!edges?.length || !created.nodes?.length) {
-                    return toolResult(created);
+                let result = created;
+                if (edges?.length && created.nodes?.length) {
+                    const realNodes = created.nodes;
+                    const resolvedEdges = edges.map(e => ({
+                        sourceNodeId: resolveNodeId(e.sourceNodeId, realNodes),
+                        sourcePortId: e.sourcePortId,
+                        targetNodeId: resolveNodeId(e.targetNodeId, realNodes),
+                        targetPortId: e.targetPortId,
+                    }));
+                    result = await client.saveFlow(created.id, { nodes: realNodes, edges: resolvedEdges });
                 }
 
-                const realNodes = created.nodes;
-                const resolvedEdges = edges.map(e => ({
-                    sourceNodeId: resolveNodeId(e.sourceNodeId, realNodes),
-                    sourcePortId: e.sourcePortId,
-                    targetNodeId: resolveNodeId(e.targetNodeId, realNodes),
-                    targetPortId: e.targetPortId,
-                }));
+                if (name !== undefined || description !== undefined) {
+                    result = await client.upsertFlow(created.id, filterDefined({ name, description }));
+                }
 
-                const saved = await client.saveFlow(created.id, {
-                    name,
-                    description,
-                    nodes: realNodes,
-                    edges: resolvedEdges,
-                });
-
-                return toolResult(saved);
+                return toolResult(withUrl(result));
             } catch (e) {
                 return toolError(e);
             }
@@ -336,7 +365,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
             try {
                 const makePublic = isPublic ?? true;
                 const result = await client.upsertFlow(flowId, { isPublic: makePublic });
-                return toolResult({ flowId, isPublic: makePublic, flow: result });
+                return toolResult({ flowId, url: urlFor(flowId), isPublic: makePublic, flow: result });
             } catch (e) {
                 return toolError(e);
             }
@@ -348,23 +377,61 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
         {
             title: 'Save Flow',
             description:
-                'DANGEROUS: Full replace of ALL nodes and edges. Node IDs will be reassigned, breaking existing edges. ' +
-                'Only use for complete flow rebuilds. For modifications, use node_update (change properties), ' +
-                'node_delete (remove nodes), or flow_create (new flow) instead.',
+                'DANGEROUS: Full replace of ALL nodes and edges in an existing flow. Node IDs may be reassigned. ' +
+                'Edges are kept intact: reference nodes by array index (e.g., "0" for the first node) and they are ' +
+                'auto-resolved to the saved node IDs. Only use for complete flow rebuilds. For modifications, use ' +
+                'node_update (change properties), node_delete (remove nodes), or flow_create (new flow) instead.',
             inputSchema: z.object({
                 flowId,
                 name: z.optional(z.string()),
                 description: z.optional(z.string()),
                 nodes: z.array(NodeDataSchema).describe('Full node list (replaces ALL existing nodes)'),
-                edges: z.array(EdgeDataSchema).describe('Full edge list (replaces ALL existing edges)'),
+                edges: z
+                    .array(EdgeDataSchema)
+                    .describe(
+                        'Full edge list (replaces ALL existing edges). Use array index as node ID (e.g., "0") — ' +
+                            'resolved to the saved node IDs internally.',
+                    ),
             }),
             outputSchema: PassthroughSchema,
             annotations: { destructiveHint: true, idempotentHint: true },
         },
         async ({ flowId, name, description, nodes, edges }) => {
             try {
-                const result = await client.saveFlow(flowId, { name, description, nodes, edges });
-                return toolResult(result);
+                // SaveFlowBody is { nodes, edges } only — the web app sets name/description via the
+                // metadata upsert endpoint, NOT the save body. Save the graph first (no edges so the
+                // backend assigns/returns the real node IDs), then resolve edges, then upsert metadata.
+                const saved = await client.saveFlow(flowId, { nodes, edges: [] });
+
+                let result = saved;
+                if (edges.length && saved.nodes?.length) {
+                    // The saved nodes come back in input order, so map each input node — by its array
+                    // index AND its pre-save ID — to the ID the backend actually assigned. Edges may
+                    // reference either form; both must land on a node that exists after the save, or
+                    // the backend stores them dangling and they vanish from the canvas.
+                    const realNodes = saved.nodes;
+                    const idMap = new Map<string, string>();
+                    nodes.forEach((n, i) => {
+                        const savedId = realNodes[i]?.id;
+                        if (!savedId) return;
+                        idMap.set(String(i), savedId);
+                        if (n.id) idMap.set(n.id, savedId);
+                    });
+                    const remap = (ref: string) => idMap.get(ref) ?? ref;
+                    const resolvedEdges = edges.map(e => ({
+                        sourceNodeId: remap(e.sourceNodeId),
+                        sourcePortId: e.sourcePortId,
+                        targetNodeId: remap(e.targetNodeId),
+                        targetPortId: e.targetPortId,
+                    }));
+                    result = await client.saveFlow(flowId, { nodes: realNodes, edges: resolvedEdges });
+                }
+
+                if (name !== undefined || description !== undefined) {
+                    result = await client.upsertFlow(flowId, filterDefined({ name, description }));
+                }
+
+                return toolResult(withUrl(result));
             } catch (e) {
                 return toolError(e);
             }
@@ -390,33 +457,28 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 const nodes = stripNodeRuntime(source.nodes ?? []);
                 const cloneName = name ?? `${source.name ?? 'Flow'} (Copy)`;
 
-                const created = await client.saveFlow('0', {
-                    name: cloneName,
-                    description: source.description,
-                    nodes,
-                    edges: [],
-                });
+                // Save the graph with the bare { nodes, edges } body; set name/description via the
+                // metadata upsert afterward (SaveFlowBody carries no name — same as the web app).
+                const created = await client.saveFlow('0', { nodes, edges: [] });
 
+                let result = created;
                 const sourceEdges = source.edges ?? [];
-                if (!sourceEdges.length || !created.nodes?.length) {
-                    return toolResult(created);
+                if (sourceEdges.length && created.nodes?.length) {
+                    const indexEdges = remapEdgesToIndices(sourceEdges, source.nodes ?? []);
+                    const resolvedEdges = indexEdges.map(e => ({
+                        sourceNodeId: resolveNodeId(e.sourceNodeId, created.nodes!),
+                        sourcePortId: e.sourcePortId,
+                        targetNodeId: resolveNodeId(e.targetNodeId, created.nodes!),
+                        targetPortId: e.targetPortId,
+                    }));
+                    result = await client.saveFlow(created.id, { nodes: created.nodes!, edges: resolvedEdges });
                 }
 
-                const indexEdges = remapEdgesToIndices(sourceEdges, source.nodes ?? []);
-                const resolvedEdges = indexEdges.map(e => ({
-                    sourceNodeId: resolveNodeId(e.sourceNodeId, created.nodes!),
-                    sourcePortId: e.sourcePortId,
-                    targetNodeId: resolveNodeId(e.targetNodeId, created.nodes!),
-                    targetPortId: e.targetPortId,
-                }));
-
-                const saved = await client.saveFlow(created.id, {
-                    name: cloneName,
-                    description: source.description,
-                    nodes: created.nodes!,
-                    edges: resolvedEdges,
-                });
-                return toolResult(saved);
+                result = await client.upsertFlow(
+                    created.id,
+                    filterDefined({ name: cloneName, description: source.description }),
+                );
+                return toolResult(withUrl(result));
             } catch (e) {
                 return toolError(e);
             }
@@ -482,6 +544,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
                     flowId,
                     expectedNodeIds,
+                    channelId: flow.channelId,
                     timeout: timeout ?? 60_000,
                     onProgress: makeProgressHandler(extra),
                     triggerRun: async connectionId => {
@@ -502,6 +565,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 return buildRunResult({
                     client,
+                    webBaseUrl: apiConfig.FLOW_WEB_URL,
                     flowId,
                     expectedNodeIds,
                     nodeStates,
@@ -546,17 +610,43 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 const flow = await client.loadFlow(flowId);
                 const allNodeIds = (flow.nodes ?? []).filter(n => !n.disabled && n.id).map(n => n.id!);
+
+                // Pick the run's seed nodes the way the web app's "Run All" does: blocks with
+                // stereo === 'input' whose autoExecution isn't disabled. Resolve stereo from the block
+                // cache (keyed by processType or block id). Fall back to "no inbound edge" when stereo
+                // can't be resolved, so unusual flows still run.
+                const blocks = await client.listBlocks();
+                const stereoOf = new Map<string, string>();
+                for (const b of blocks.list ?? []) {
+                    if (!b.stereo) continue;
+                    if (b.processType) stereoOf.set(b.processType, b.stereo);
+                    if (b.id) stereoOf.set(b.id, b.stereo);
+                }
+                const inputNodeIds = (flow.nodes ?? [])
+                    .filter(
+                        n =>
+                            n.id && !n.disabled && n.autoExecutionEnabled !== false && stereoOf.get(n.type) === 'input',
+                    )
+                    .map(n => n.id!);
                 const targetNodeIds = new Set((flow.edges ?? []).map(e => e.targetNodeId));
-                const startNodeIds = allNodeIds.filter(id => !targetNodeIds.has(id));
+                const startNodeIds =
+                    inputNodeIds.length > 0 ? inputNodeIds : allNodeIds.filter(id => !targetNodeIds.has(id));
 
                 const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
                     flowId,
                     expectedNodeIds: allNodeIds,
+                    channelId: flow.channelId,
                     timeout: timeout ?? 60_000,
                     onProgress: makeProgressHandler(extra),
                     triggerRun: async connectionId => {
-                        const runOpts = { propagate: true, async: true, connection: connectionId };
-                        await Promise.all(startNodeIds.map(nodeId => client.runNode(nodeId, runOpts)));
+                        // Match the web app exactly: ONE POST /flows/:id/run with all input node IDs so the
+                        // backend orchestrates a single cascade. Triggering each start node separately (N
+                        // parallel runNode+propagate) overlaps cascades and re-runs downstream nodes — extra
+                        // runIds and duplicate (billable) AI calls. See WorkflowCanvas.tsx runFlow().
+                        const runBody = runConfig
+                            ? { nodeIds: startNodeIds, config: runConfig }
+                            : { nodeIds: startNodeIds };
+                        await client.runFlow(flowId, runBody, { async: true, connection: connectionId });
                     },
                 });
 
@@ -569,6 +659,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
 
                 return buildRunResult({
                     client,
+                    webBaseUrl: apiConfig.FLOW_WEB_URL,
                     flowId,
                     expectedNodeIds: allNodeIds,
                     nodeStates,

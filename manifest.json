@@ -3,11 +3,12 @@
   "name": "flow-mcp",
   "display_name": "Eureka Flow",
   "version": "0.1.0",
+  "icon": "icon.png",
   "description": "Build, run, publish Eureka Flow visual workflows and manage credits from Claude — no code.",
   "long_description": "Eureka Flow MCP server. Lets Claude (and other MCP clients) create visual workflows, run them, publish them publicly, and manage billing credits at flow.eureka.codes / billing.eureka.codes — all in natural language. No key to copy: leave the API key blank and just say \"log in\" — the assistant opens a browser for Google sign-in and provisions a key. One key unlocks both flows and credits.",
   "author": {
     "name": "Lemoncloud",
-    "url": "https://github.com/lemoncloud-io"
+    "url": "https://lemoncloud.io/"
   },
   "homepage": "https://flow.eureka.codes",
   "documentation": "https://github.com/lemoncloud-io/flow-mcp#readme",
@@ -44,7 +45,7 @@
     "api_key": {
       "type": "string",
       "title": "Eureka API Key (optional)",
-      "description": "Optional — leave this blank and just say \"log in\" in chat: the assistant opens a browser for Google sign-in and provisions a key for you. Or paste an existing key from https://flow.eureka.codes → sign in with Google → Create Key → Copy (looks like \"ec-...\"). Unlocks both flows and credits.",
+      "description": "Leave blank and say \"log in\" in chat — the assistant signs you in with Google and stores a key. Or paste an existing ec-… key from flow.eureka.codes.",
       "sensitive": true,
       "required": false
     }

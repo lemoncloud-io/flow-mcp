@@ -28,9 +28,22 @@ export const registerAuthTools = (
             inputSchema: z.object({}),
             outputSchema: PassthroughSchema,
         },
-        async () => {
+        async (_args, extra) => {
             try {
-                const result = await runBrowserLogin(config, msg => mcpLog(server, 'info', msg));
+                const progressToken = extra._meta?.progressToken;
+                // Surface poll progress as both a text log and an MCP progress notification (client loader).
+                const onProgress = (msg: string, tick?: { current: number; total: number }) => {
+                    mcpLog(server, 'info', msg);
+                    if (tick && progressToken !== undefined) {
+                        extra
+                            .sendNotification({
+                                method: 'notifications/progress',
+                                params: { progressToken, progress: tick.current, total: tick.total, message: msg },
+                            })
+                            .catch(() => {});
+                    }
+                };
+                const result = await runBrowserLogin(config, onProgress);
                 // Save regardless of activation so a slightly-delayed key is still picked up by later calls.
                 credentials.save(result.apiKey, { uid: result.uid, sid: result.sid });
                 const message = result.activated

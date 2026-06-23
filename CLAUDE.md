@@ -8,7 +8,7 @@ flow-mcp is an MCP (Model Context Protocol) server that provides AI assistants w
 
 ```
 src/
-├── config.ts           # Zod v4 env validation (FLOW_API_URL, FLOW_API_KEY)
+├── config.ts           # Zod v4 env validation (FLOW_API_URL, FLOW_WEB_URL, FLOW_API_KEY)
 ├── logger.ts           # stderr-based logger (safe for stdio MCP)
 ├── api-client.ts       # Axios client for eureka-flows-api + block cache
 ├── types.ts            # Domain types (FlowView, NodeData, EdgeData, etc.)

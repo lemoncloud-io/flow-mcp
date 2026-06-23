@@ -79,6 +79,7 @@ describe('flow tool handlers', () => {
       expect(parsed.total).toBe(2);
       expect(parsed.flows[0].id).toBe('f-1');
       expect(parsed.flows[0].name).toBe('Flow 1');
+      expect(parsed.flows[0].url).toBe('https://flow.example.com/flows/f-1');
     });
 
     it('should pass isPublic filter', async () => {
@@ -89,17 +90,12 @@ describe('flow tool handlers', () => {
       expect(mockClient.listFlows).toHaveBeenCalledWith({ isPublic: true });
     });
 
-    it('should call without filter when isPublic is undefined', async () => {
+    it('should pass page through (default undefined)', async () => {
       mockClient.listFlows.mockResolvedValue(makeListResult([]));
 
-      await handlers.flow_list({ isPublic: undefined });
+      await handlers.flow_list({ isPublic: undefined, page: 3 });
 
-      expect(mockClient.listFlows).toHaveBeenCalledWith({
-        isPublic: undefined,
-        limit: undefined,
-        offset: undefined,
-        sort: undefined,
-      });
+      expect(mockClient.listFlows).toHaveBeenCalledWith({ isPublic: undefined, page: 3 });
     });
 
     it('should return toolError on API failure', async () => {
@@ -120,6 +116,7 @@ describe('flow tool handlers', () => {
       const parsed = JSON.parse((result as { content: Array<{ text: string }> }).content[0].text);
 
       expect(parsed.id).toBe('f-1');
+      expect(parsed.url).toBe('https://flow.example.com/flows/f-1');
     });
 
     it('should return toolError on failure', async () => {
@@ -132,14 +129,17 @@ describe('flow tool handlers', () => {
   });
 
   describe('flow_create', () => {
-    it('should create flow with single saveFlow call when no edges', async () => {
+    it('should save graph then set name via metadata upsert (no name in save body)', async () => {
       const created = makeSaveFlow({ id: 'new-1', nodes: [makeNode({ id: 'n-0' })] });
       mockClient.saveFlow.mockResolvedValue(created);
+      mockClient.upsertFlow.mockResolvedValue(makeSaveFlow({ id: 'new-1', name: 'New' }));
 
       await handlers.flow_create({ name: 'New', description: undefined, nodes: [{ type: 'input-text', position: { x: 0, y: 0 } }], edges: undefined });
 
+      // Save body carries only { nodes, edges } — never name/description.
       expect(mockClient.saveFlow).toHaveBeenCalledTimes(1);
-      expect(mockClient.saveFlow).toHaveBeenCalledWith('0', expect.objectContaining({ name: 'New', edges: [] }));
+      expect(mockClient.saveFlow).toHaveBeenCalledWith('0', { nodes: [{ type: 'input-text', position: { x: 0, y: 0 } }], edges: [] });
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith('new-1', { name: 'New' });
     });
 
     it('should call saveFlow twice when edges are provided (index resolution)', async () => {
@@ -150,6 +150,7 @@ describe('flow tool handlers', () => {
       mockClient.saveFlow
         .mockResolvedValueOnce(created)  // first call: create
         .mockResolvedValueOnce(saved);    // second call: save with edges
+      mockClient.upsertFlow.mockResolvedValue(makeSaveFlow({ id: 'new-1', name: 'Wired' }));
 
       const edges = [{ sourceNodeId: '0', sourcePortId: 'out', targetNodeId: '1', targetPortId: 'in' }];
       await handlers.flow_create({
@@ -168,11 +169,14 @@ describe('flow tool handlers', () => {
       expect(secondCall[0]).toBe('new-1');
       expect(secondCall[1].edges[0].sourceNodeId).toBe('real-a');
       expect(secondCall[1].edges[0].targetNodeId).toBe('real-b');
+      // Name persisted via metadata upsert, not the save body.
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith('new-1', { name: 'Wired' });
     });
 
     it('should skip second save when created.nodes is empty', async () => {
       const created = makeSaveFlow({ id: 'new-1', nodes: [] });
       mockClient.saveFlow.mockResolvedValue(created);
+      mockClient.upsertFlow.mockResolvedValue(makeSaveFlow({ id: 'new-1', name: 'Empty' }));
 
       const edges = [{ sourceNodeId: '0', sourcePortId: 'out', targetNodeId: '1', targetPortId: 'in' }];
       await handlers.flow_create({ name: 'Empty', description: undefined, nodes: [], edges });
@@ -190,8 +194,9 @@ describe('flow tool handlers', () => {
   });
 
   describe('flow_save', () => {
-    it('should pass all fields to saveFlow', async () => {
-      mockClient.saveFlow.mockResolvedValue(makeSaveFlow());
+    it('should send graph to save body and name/description via metadata upsert', async () => {
+      mockClient.saveFlow.mockResolvedValue(makeSaveFlow({ id: 'f-1' }));
+      mockClient.upsertFlow.mockResolvedValue(makeSaveFlow({ id: 'f-1', name: 'Updated' }));
 
       await handlers.flow_save({
         flowId: 'f-1',
@@ -201,12 +206,71 @@ describe('flow tool handlers', () => {
         edges: [],
       });
 
+      // SaveFlowBody carries only { nodes, edges } — never name/description.
       expect(mockClient.saveFlow).toHaveBeenCalledWith('f-1', {
-        name: 'Updated',
-        description: 'desc',
         nodes: [{ type: 'input-text', position: { x: 0, y: 0 } }],
         edges: [],
       });
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith('f-1', { name: 'Updated', description: 'desc' });
+    });
+
+    it('should save edges in a second call with indices resolved to saved node IDs', async () => {
+      const savedNodes = [makeNode({ id: 'real-a' }), makeNode({ id: 'real-b' })];
+      const saved = makeSaveFlow({ id: 'f-1', nodes: savedNodes, edges: [] });
+
+      mockClient.saveFlow
+        .mockResolvedValueOnce(saved) // first call: nodes only (edges stripped)
+        .mockResolvedValueOnce(saved); // second call: edges with real IDs
+      mockClient.upsertFlow.mockResolvedValue(makeSaveFlow({ id: 'f-1', name: 'Rebuilt' }));
+
+      await handlers.flow_save({
+        flowId: 'f-1',
+        name: 'Rebuilt',
+        description: undefined,
+        nodes: [
+          { type: 'input-text', position: { x: 0, y: 0 } },
+          { type: 'output-text', position: { x: 200, y: 0 } },
+        ],
+        edges: [{ sourceNodeId: '0', sourcePortId: 'out', targetNodeId: '1', targetPortId: 'in' }],
+      });
+
+      expect(mockClient.saveFlow).toHaveBeenCalledTimes(2);
+      // First call must strip edges so the backend does not orphan them.
+      expect(mockClient.saveFlow.mock.calls[0][1].edges).toEqual([]);
+      // Save body never carries name — that goes through the metadata upsert.
+      expect(mockClient.saveFlow.mock.calls[0][1].name).toBeUndefined();
+      // Second call resolves index refs to the real saved node IDs.
+      const secondCall = mockClient.saveFlow.mock.calls[1];
+      expect(secondCall[1].edges[0].sourceNodeId).toBe('real-a');
+      expect(secondCall[1].edges[0].targetNodeId).toBe('real-b');
+      // Name persisted via metadata upsert.
+      expect(mockClient.upsertFlow).toHaveBeenCalledWith('f-1', { name: 'Rebuilt' });
+    });
+
+    it('should remap edges that reference pre-save node IDs to the reassigned IDs', async () => {
+      // The user's real failure: nodes carry their existing IDs and edges reference those same
+      // IDs, but /save reassigns them. Edges must follow the reassignment, not point at dead IDs.
+      const savedNodes = [makeNode({ id: 'new-a' }), makeNode({ id: 'new-b' })];
+      const saved = makeSaveFlow({ id: 'f-1', nodes: savedNodes, edges: [] });
+
+      mockClient.saveFlow.mockResolvedValueOnce(saved).mockResolvedValueOnce(saved);
+
+      await handlers.flow_save({
+        flowId: 'f-1',
+        name: undefined,
+        description: undefined,
+        nodes: [
+          { id: 'old-a', type: 'input-text', position: { x: 0, y: 0 } },
+          { id: 'old-b', type: 'output-text', position: { x: 200, y: 0 } },
+        ],
+        edges: [{ sourceNodeId: 'old-a', sourcePortId: 'out', targetNodeId: 'old-b', targetPortId: 'in' }],
+      });
+
+      const secondCall = mockClient.saveFlow.mock.calls[1];
+      expect(secondCall[1].edges[0].sourceNodeId).toBe('new-a');
+      expect(secondCall[1].edges[0].targetNodeId).toBe('new-b');
+      // No metadata upsert when name/description are absent.
+      expect(mockClient.upsertFlow).not.toHaveBeenCalled();
     });
 
     it('should return toolError on failure', async () => {

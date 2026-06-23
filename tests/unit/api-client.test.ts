@@ -60,36 +60,53 @@ describe('FlowApiClient', () => {
       expect(thrown).toBeInstanceOf(FlowApiError);
       expect((thrown as FlowApiError).code).toBe('auth_required');
     });
+
+    it('should allow keyless /public/ requests without throwing', () => {
+      const client = new FlowApiClient(makeConfig(), { getApiKey: () => null } as unknown as CredentialStore);
+      const axiosInstance = (
+        client as unknown as {
+          client: { interceptors: { request: { handlers: Array<{ fulfilled: (c: unknown) => unknown }> } } };
+        }
+      ).client;
+      const interceptor = axiosInstance.interceptors.request.handlers[0].fulfilled;
+      const set = vi.fn();
+
+      const cfg = { url: 'https://api.example.com/public/products/0/list', headers: { set } };
+      expect(() => interceptor(cfg)).not.toThrow();
+      expect(set).not.toHaveBeenCalled(); // no key → no x-api-key header, but request proceeds
+    });
   });
 
   describe('listFlows', () => {
-    it('should call GET /flows by default', async () => {
+    it('should call GET /flows?view=mine&page=0 by default', async () => {
       const { client, axiosInstance } = createClient();
       const data = makeListResult([makeFlow()]);
       vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data });
 
       const result = await client.listFlows();
 
-      expect(axiosInstance.get).toHaveBeenCalledWith('/flows', { params: {} });
+      expect(axiosInstance.get).toHaveBeenCalledWith('/flows', { params: { view: 'mine', page: 0 } });
       expect(result).toEqual(data);
     });
 
-    it('should call absolute /public/flows URL when isPublic is true', async () => {
+    it('should call absolute /public/flows URL with page when isPublic is true', async () => {
       const { client, axiosInstance } = createClient();
       vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makeListResult([]) });
 
-      await client.listFlows({ isPublic: true });
+      await client.listFlows({ isPublic: true, page: 2 });
 
-      expect(axiosInstance.get).toHaveBeenCalledWith('https://api.example.com/public/flows', { params: {} });
+      expect(axiosInstance.get).toHaveBeenCalledWith('https://api.example.com/public/flows', {
+        params: { page: 2 },
+      });
     });
 
-    it('should call GET /flows when isPublic is false', async () => {
+    it('should call GET /flows?view=mine when isPublic is false', async () => {
       const { client, axiosInstance } = createClient();
       vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makeListResult([]) });
 
-      await client.listFlows({ isPublic: false });
+      await client.listFlows({ isPublic: false, page: 1 });
 
-      expect(axiosInstance.get).toHaveBeenCalledWith('/flows', { params: {} });
+      expect(axiosInstance.get).toHaveBeenCalledWith('/flows', { params: { view: 'mine', page: 1 } });
     });
   });
 
@@ -116,6 +133,24 @@ describe('FlowApiClient', () => {
       await client.saveFlow('f-1', body);
 
       expect(axiosInstance.post).toHaveBeenCalledWith('/flows/f-1/save', body);
+    });
+
+    it('should fall back to legacy nodes$$/edges$$ when preferred keys are empty', async () => {
+      const { client, axiosInstance } = createClient();
+      // Backend returned the graph only under the deprecated keys, leaving nodes/edges empty.
+      const raw = {
+        id: 'f-1',
+        nodes: [],
+        edges: [],
+        nodes$$: [{ id: 'n-1', type: 'input-text', position: { x: 0, y: 0 } }],
+        edges$$: [{ id: 'e-1', sourceNodeId: 'n-1', sourcePortId: 'out', targetNodeId: 'n-2', targetPortId: 'in' }],
+      };
+      vi.spyOn(axiosInstance, 'post').mockResolvedValue({ data: raw });
+
+      const result = await client.saveFlow('f-1', { nodes: [], edges: [] });
+
+      expect(result.nodes).toEqual(raw.nodes$$);
+      expect(result.edges).toEqual(raw.edges$$);
     });
   });
 
@@ -193,14 +228,28 @@ describe('FlowApiClient', () => {
   });
 
   describe('getPortData', () => {
-    it('should encode port ref as nodeId:portId@direction', async () => {
+    it('should use nodeId:portName path with direction query (web-app format)', async () => {
       const { client, axiosInstance } = createClient();
       vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makePortData() });
 
       await client.getPortData('node-1', 'out', 'out');
 
-      const expectedRef = encodeURIComponent('node-1:out@out');
-      expect(axiosInstance.get).toHaveBeenCalledWith(`/nodes/${expectedRef}/port`);
+      const expectedRef = encodeURIComponent('node-1:out');
+      expect(axiosInstance.get).toHaveBeenCalledWith(`/nodes/${expectedRef}/port`, {
+        params: { direction: 'out' },
+      });
+    });
+
+    it('should pass runId and flowId as run-scoping query params', async () => {
+      const { client, axiosInstance } = createClient();
+      vi.spyOn(axiosInstance, 'get').mockResolvedValue({ data: makePortData() });
+
+      await client.getPortData('node-1', 'out', 'out', { flowId: 'f-1', runId: 'r-9' });
+
+      const expectedRef = encodeURIComponent('node-1:out');
+      expect(axiosInstance.get).toHaveBeenCalledWith(`/nodes/${expectedRef}/port`, {
+        params: { direction: 'out', flowId: 'f-1', runId: 'r-9' },
+      });
     });
   });
 

@@ -11,7 +11,7 @@ export const completableFlowId = (client: FlowApiClient) =>
     completable(z.string().describe('Flow ID'), async value => {
         const now = Date.now();
         if (!flowCache || now - flowCache.at > FLOW_CACHE_TTL) {
-            const result = await client.listFlows({ limit: 50 });
+            const result = await client.listFlows({ page: 0 });
             flowCache = { list: result.list, at: now };
         }
         const lower = value.toLowerCase();

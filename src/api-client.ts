@@ -7,6 +7,8 @@ import type {
     FlowView,
     SaveFlowView,
     SaveFlowBody,
+    NodeData,
+    EdgeData,
     NodeView,
     PortData,
     BlockView,
@@ -41,17 +43,21 @@ export class FlowApiClient {
         logger.info(`API base: ${this.baseUrl}${apiPath}`);
 
         // Inject the x-api-key per request so a key minted mid-session (via the auth tool) is used
-        // immediately, without restarting the server. No key yet → fail fast with auth_required.
+        // immediately, without restarting the server. No key yet → fail fast with auth_required,
+        // EXCEPT for /public/ endpoints (e.g. public flows, credit packs) which the backend serves
+        // keyless — those proceed without a key, but still send one when present.
         this.client.interceptors.request.use(requestConfig => {
             const apiKey = this.credentials.getApiKey();
-            if (!apiKey) {
+            const isPublic = (requestConfig.url ?? '').includes('/public/');
+            if (apiKey) {
+                requestConfig.headers.set('x-api-key', apiKey);
+            } else if (!isPublic) {
                 throw new FlowApiError(
                     'auth_required',
                     'Not authenticated. Ask the assistant to log in (the auth tool opens a browser for Google sign-in), ' +
                         'or set FLOW_API_KEY.',
                 );
             }
-            requestConfig.headers.set('x-api-key', apiKey);
             return requestConfig;
         });
 
@@ -77,43 +83,56 @@ export class FlowApiClient {
         return data;
     }
 
-    async listFlows(opts?: {
-        isPublic?: boolean;
-        limit?: number;
-        offset?: number;
-        sort?: string;
-    }): Promise<ListResult<FlowView>> {
-        const params: Record<string, string | number> = {};
-        if (opts?.limit !== undefined) params.limit = opts.limit;
-        if (opts?.offset !== undefined) params.offset = opts.offset;
-        if (opts?.sort) params.sort = opts.sort;
-
+    async listFlows(opts?: { isPublic?: boolean; page?: number }): Promise<ListResult<FlowView>> {
+        const page = opts?.page ?? 0;
         if (opts?.isPublic) {
-            const { data } = await this.client.get(`${this.baseUrl}/public/flows`, { params });
+            // Public flows: GET /public/flows?page=N (matches the web app's listPublicFlows).
+            const { data } = await this.client.get(`${this.baseUrl}/public/flows`, { params: { page } });
             return data;
         }
-        const { data } = await this.client.get('/flows', { params });
+        // My flows: GET /flows?view=mine&page=N. Without view=mine the listing isn't scoped to the user.
+        const { data } = await this.client.get('/flows', { params: { view: 'mine', page } });
         return data;
+    }
+
+    // The backend returns graph data under either the preferred `nodes`/`edges`/`ports` keys or the
+    // deprecated `nodes$$`/`edges$$`/`ports$$` keys (server v0.26.213+ may send only the legacy set,
+    // sometimes leaving the preferred key as an empty array). Mirror the web app and prefer whichever
+    // is non-empty, so callers never see an empty graph when the data is just under the legacy key.
+    private normalizeFlowView(data: SaveFlowView): SaveFlowView {
+        const raw = data as SaveFlowView & {
+            nodes$$?: NodeData[];
+            edges$$?: EdgeData[];
+            ports$$?: PortData[];
+        };
+        const pick = <T>(primary?: T[], legacy?: T[]): T[] | undefined =>
+            primary?.length ? primary : legacy?.length ? legacy : primary;
+        return {
+            ...data,
+            nodes: pick(raw.nodes, raw.nodes$$),
+            edges: pick(raw.edges, raw.edges$$),
+            ports: pick(raw.ports, raw.ports$$),
+        };
     }
 
     async loadFlow(id: string): Promise<SaveFlowView> {
         const { data } = await this.client.get(`/flows/${id}/load`);
-        return data;
+        return this.normalizeFlowView(data);
     }
 
     async saveFlow(id: string, body: SaveFlowBody): Promise<SaveFlowView> {
         const { data } = await this.client.post(`/flows/${id}/save`, body);
-        return data;
+        return this.normalizeFlowView(data);
     }
 
     async upsertFlow(id: string, body: Record<string, unknown>): Promise<SaveFlowView> {
         const { data } = await this.client.post(`/flows/${id}/upsert`, body);
-        return data;
+        return this.normalizeFlowView(data);
     }
 
     async runFlow(
         id: string,
-        body?: { config?: Record<string, string> },
+        body?: { nodeIds?: string[]; config?: Record<string, string> },
         opts?: { async?: boolean; connection?: string },
     ): Promise<FlowView> {
         const params: Record<string, string> = { async: opts?.async ? '1' : '0' };
@@ -164,9 +183,20 @@ export class FlowApiClient {
         return data;
     }
 
-    async getPortData(nodeId: string, portId: string, direction: string): Promise<PortData> {
-        const portRef = `${nodeId}:${portId}@${direction}`;
-        const { data } = await this.client.get(`/nodes/${encodeURIComponent(portRef)}/port`);
+    async getPortData(
+        nodeId: string,
+        portId: string,
+        direction: string,
+        opts?: { flowId?: string; runId?: string },
+    ): Promise<PortData> {
+        // Match the web app: the route param is "nodeId:portName" (no @direction); direction is a query
+        // param. Port data is run-scoped, so runId is required to read a specific run's output — without
+        // it the backend returns empty. (api/nodes.ts getPortData + useSocketHandlers.ts handlePortUpdate.)
+        const portRef = `${nodeId}:${portId}`;
+        const params: Record<string, string> = { direction };
+        if (opts?.flowId) params.flowId = opts.flowId;
+        if (opts?.runId) params.runId = opts.runId;
+        const { data } = await this.client.get(`/nodes/${encodeURIComponent(portRef)}/port`, { params });
         return data;
     }
 

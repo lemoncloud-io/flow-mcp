@@ -58,6 +58,17 @@ describe('getConfig', () => {
     expect(config?.FLOW_API_KEY).toBeUndefined();
   });
 
+  it('should treat an unsubstituted ${user_config.api_key} placeholder as unset', async () => {
+    // An unfilled optional .mcpb slot can inject the raw template literal — it must not mask a login key.
+    vi.stubEnv('FLOW_API_URL', 'https://api.example.com');
+    vi.stubEnv('FLOW_API_KEY', '${user_config.api_key}');
+    const { getConfig } = await loadConfig();
+
+    const config = getConfig();
+    expect(config).not.toBeNull();
+    expect(config?.FLOW_API_KEY).toBeUndefined();
+  });
+
   it('should coerce FLOW_API_TIMEOUT string to number', async () => {
     vi.stubEnv('FLOW_API_URL', VALID_ENV.FLOW_API_URL);
     vi.stubEnv('FLOW_API_KEY', VALID_ENV.FLOW_API_KEY);

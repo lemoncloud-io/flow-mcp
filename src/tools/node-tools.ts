@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { FlowApiClient } from '../api-client';
 import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured } from '../ws-client';
-import { filterDefined, makeProgressHandler, mcpLog, toolError, toolResult } from './helpers';
+import { filterDefined, makeProgressHandler, mcpLog, resolveOutputs, toolError, toolResult } from './helpers';
 import { completableFlowId, completableBlockType } from './completions';
 import { PassthroughSchema, NodeRunOutputSchema } from './schemas';
 
@@ -56,14 +56,28 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
         },
         async ({ flowId, blockId, position, config: nodeConfig, customLabel }) => {
             try {
-                const result = await client.upsertNode('0', flowId, {
-                    blockId,
-                    position: position ?? { x: 400, y: 300 },
-                    config: nodeConfig ?? {},
-                    customLabel,
-                    autoExecutionEnabled: true,
+                // Add the node through the flow graph: upsertFlow MERGES and links it into the flow's
+                // node list. A bare POST /nodes/0/upsert creates an orphan node that never joins the
+                // flow, so it never shows up on load. Diff before/after to return the new node's id.
+                const before = await client.loadFlow(flowId);
+                const beforeIds = new Set((before.nodes ?? []).map(n => n.id).filter(Boolean));
+                const result = await client.upsertFlow(flowId, {
+                    nodes: [
+                        filterDefined({
+                            // The web app's transformNodeForSave sets BOTH type (processType) and blockId
+                            // (blockId ?? type). Mirror it so the backend resolves the block on either key.
+                            type: blockId,
+                            blockId,
+                            position: position ?? { x: 400, y: 300 },
+                            config: nodeConfig ?? {},
+                            customLabel,
+                            autoExecutionEnabled: true,
+                        }),
+                    ],
+                    edges: [],
                 });
-                return toolResult(result);
+                const newNode = (result.nodes ?? []).find(n => n.id && !beforeIds.has(n.id));
+                return toolResult(newNode ?? result);
             } catch (e) {
                 return toolError(e);
             }
@@ -99,9 +113,13 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
 
                 const startTime = Date.now();
 
+                // Resolve the flow's WS channel so events arrive even when channelId isn't the '0000' default.
+                const channelId = (await client.loadFlow(flowId)).channelId;
+
                 const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
                     flowId,
                     expectedNodeIds: [nodeId],
+                    channelId,
                     timeout: timeout ?? 30_000,
                     onProgress: makeProgressHandler(extra),
                     triggerRun: connectionId =>
@@ -117,11 +135,13 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     `Node ${nodeId} ${timedOut ? 'timed out' : status} in ${duration}ms`,
                 );
 
+                const outputs = await resolveOutputs(client, flowId, eventLog);
                 const result: Record<string, unknown> = {
                     nodeId,
                     flowId,
                     status,
                     duration,
+                    ...(outputs.length > 0 && { outputs }),
                     eventLog,
                 };
 
@@ -149,13 +169,19 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 nodeId: z.string().describe('Node ID'),
                 portId: z.string().describe('Port ID (e.g., "out", "in")'),
                 direction: z.enum(['in', 'out']).describe('Port direction'),
+                flowId: z.optional(z.string()).describe('Flow ID (recommended — scopes the lookup)'),
+                runId: z
+                    .optional(z.string())
+                    .describe(
+                        'Run ID from a flow_run/node_run eventLog. Port data is run-scoped; omit to read latest.',
+                    ),
             }),
             outputSchema: PassthroughSchema,
             annotations: { readOnlyHint: true },
         },
-        async ({ nodeId, portId, direction }) => {
+        async ({ nodeId, portId, direction, flowId, runId }) => {
             try {
-                const result = await client.getPortData(nodeId, portId, direction);
+                const result = await client.getPortData(nodeId, portId, direction, { flowId, runId });
                 return toolResult(result);
             } catch (e) {
                 return toolError(e);
@@ -232,11 +258,19 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
         },
         async ({ flowId, nodeIds }) => {
             try {
+                // Match the canvas: delete a node AND its connected edges in the same upsert, otherwise
+                // edges are left dangling at a node that no longer exists. (WorkflowCanvas deleteNode.)
+                const idSet = new Set(nodeIds);
+                const flow = await client.loadFlow(flowId);
+                const danglingEdgeIds = (flow.edges ?? [])
+                    .filter(e => e.id && (idSet.has(e.sourceNodeId) || idSet.has(e.targetNodeId)))
+                    .map(e => e.id!);
+
                 await client.upsertFlow(flowId, {
                     nodes: nodeIds.map(id => ({ id: `#${id}` })),
-                    edges: [],
+                    edges: danglingEdgeIds.map(id => ({ id: `#${id}` })),
                 });
-                return toolResult({ deleted: nodeIds, flowId });
+                return toolResult({ deleted: nodeIds, deletedEdges: danglingEdgeIds, flowId });
             } catch (e) {
                 return toolError(e);
             }

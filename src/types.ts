@@ -22,6 +22,8 @@ export interface FlowView {
     activeRunId?: string;
     modifiedAt?: number;
     meta?: Record<string, unknown>;
+    /** WebSocket channel for real-time run events (from /flows/:id/load). Defaults to '0000'. */
+    channelId?: string;
 }
 
 export interface SaveFlowView extends FlowView {
@@ -41,6 +43,7 @@ export interface NodeData {
     customLabel?: string;
     description?: string;
     disabled?: boolean;
+    autoExecutionEnabled?: boolean;
     config?: Record<string, string>;
     input?: Record<string, string>;
     output?: Record<string, string>;
