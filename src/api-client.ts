@@ -7,6 +7,8 @@ import type {
     FlowView,
     SaveFlowView,
     SaveFlowBody,
+    NodeData,
+    EdgeData,
     NodeView,
     PortData,
     BlockView,
@@ -93,19 +95,39 @@ export class FlowApiClient {
         return data;
     }
 
+    // The backend returns graph data under either the preferred `nodes`/`edges`/`ports` keys or the
+    // deprecated `nodes$$`/`edges$$`/`ports$$` keys (server v0.26.213+ may send only the legacy set,
+    // sometimes leaving the preferred key as an empty array). Mirror the web app and prefer whichever
+    // is non-empty, so callers never see an empty graph when the data is just under the legacy key.
+    private normalizeFlowView(data: SaveFlowView): SaveFlowView {
+        const raw = data as SaveFlowView & {
+            nodes$$?: NodeData[];
+            edges$$?: EdgeData[];
+            ports$$?: PortData[];
+        };
+        const pick = <T>(primary?: T[], legacy?: T[]): T[] | undefined =>
+            primary?.length ? primary : legacy?.length ? legacy : primary;
+        return {
+            ...data,
+            nodes: pick(raw.nodes, raw.nodes$$),
+            edges: pick(raw.edges, raw.edges$$),
+            ports: pick(raw.ports, raw.ports$$),
+        };
+    }
+
     async loadFlow(id: string): Promise<SaveFlowView> {
         const { data } = await this.client.get(`/flows/${id}/load`);
-        return data;
+        return this.normalizeFlowView(data);
     }
 
     async saveFlow(id: string, body: SaveFlowBody): Promise<SaveFlowView> {
         const { data } = await this.client.post(`/flows/${id}/save`, body);
-        return data;
+        return this.normalizeFlowView(data);
     }
 
     async upsertFlow(id: string, body: Record<string, unknown>): Promise<SaveFlowView> {
         const { data } = await this.client.post(`/flows/${id}/upsert`, body);
-        return data;
+        return this.normalizeFlowView(data);
     }
 
     async runFlow(

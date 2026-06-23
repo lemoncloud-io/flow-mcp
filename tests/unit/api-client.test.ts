@@ -134,6 +134,24 @@ describe('FlowApiClient', () => {
 
       expect(axiosInstance.post).toHaveBeenCalledWith('/flows/f-1/save', body);
     });
+
+    it('should fall back to legacy nodes$$/edges$$ when preferred keys are empty', async () => {
+      const { client, axiosInstance } = createClient();
+      // Backend returned the graph only under the deprecated keys, leaving nodes/edges empty.
+      const raw = {
+        id: 'f-1',
+        nodes: [],
+        edges: [],
+        nodes$$: [{ id: 'n-1', type: 'input-text', position: { x: 0, y: 0 } }],
+        edges$$: [{ id: 'e-1', sourceNodeId: 'n-1', sourcePortId: 'out', targetNodeId: 'n-2', targetPortId: 'in' }],
+      };
+      vi.spyOn(axiosInstance, 'post').mockResolvedValue({ data: raw });
+
+      const result = await client.saveFlow('f-1', { nodes: [], edges: [] });
+
+      expect(result.nodes).toEqual(raw.nodes$$);
+      expect(result.edges).toEqual(raw.edges$$);
+    });
   });
 
 
