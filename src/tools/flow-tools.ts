@@ -583,8 +583,14 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     timeout: timeout ?? 60_000,
                     onProgress: makeProgressHandler(extra),
                     triggerRun: async connectionId => {
-                        const runOpts = { propagate: true, async: true, connection: connectionId };
-                        await Promise.all(startNodeIds.map(nodeId => client.runNode(nodeId, runOpts)));
+                        // Match the web app exactly: ONE POST /flows/:id/run with all input node IDs so the
+                        // backend orchestrates a single cascade. Triggering each start node separately (N
+                        // parallel runNode+propagate) overlaps cascades and re-runs downstream nodes — extra
+                        // runIds and duplicate (billable) AI calls. See WorkflowCanvas.tsx runFlow().
+                        const runBody = runConfig
+                            ? { nodeIds: startNodeIds, config: runConfig }
+                            : { nodeIds: startNodeIds };
+                        await client.runFlow(flowId, runBody, { async: true, connection: connectionId });
                     },
                 });
 

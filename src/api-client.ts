@@ -117,7 +117,7 @@ export class FlowApiClient {
 
     async runFlow(
         id: string,
-        body?: { config?: Record<string, string> },
+        body?: { nodeIds?: string[]; config?: Record<string, string> },
         opts?: { async?: boolean; connection?: string },
     ): Promise<FlowView> {
         const params: Record<string, string> = { async: opts?.async ? '1' : '0' };
