@@ -13,3 +13,5 @@ export {
     AUTH_ACTIONS,
 } from './dispatch';
 export { completableFlowId, completableBlockType, completableStereo, completableProductId } from './completions';
+export { registerFlowPrompts, FLOW_PROMPTS } from './prompts';
+export type { FlowPrompt } from './prompts';

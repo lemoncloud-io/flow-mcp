@@ -17,6 +17,11 @@
 </p>
 
 <p align="center">
+  <b>In plain words:</b> it gives Claude (and other AI assistants) the ability to build and run<br/>
+  automated workflows for you — just by chatting. No code, no setup beyond a one-time sign-in.
+</p>
+
+<p align="center">
   <a href="README.ko.md">한국어</a>
 </p>
 
@@ -28,6 +33,12 @@
   </picture>
 </p>
 
+## What's this for?
+
+**Eureka Flow** is a visual tool for chaining steps into a *flow*: take some input, process it (summarize, transform, call an AI model, hit an API), and get a result — without writing code. Each step is a **block**, and you connect blocks to pass data along.
+
+Normally you'd build those flows by hand in the editor. **flow-mcp** lets your AI assistant do it for you: you describe what you want in chat ("make a flow that summarizes the text I paste"), and it creates, runs, and inspects the flow on your behalf. Think of it as giving Claude hands to operate Eureka Flow.
+
 ## What You Can Do
 
 Works with **Claude Desktop**, **Cursor**, **Windsurf**, **VS Code (Continue/Cline)**, **Claude Code**, and any MCP-compatible client.
@@ -36,7 +47,7 @@ Just ask in natural language:
 
 | What you want | Say this to Claude |
 |---------------|-------------------|
-| Sign in (no key to copy) | "Log in to Eureka" |
+| Sign in (no key to copy) | "Log in to Flow" |
 | List workflows | "Show my flows" |
 | Create a workflow | "Create a flow: text input → buffer → preview" |
 | Run a workflow | "Run flow 1004897" |
@@ -51,7 +62,7 @@ No code required. No tool names to remember. Just ask in natural language.
 
 ## Quick Start
 
-> **You'll need:** the [**Claude Desktop**](https://claude.ai/download) app installed, and a free Eureka account (just sign in with Google — no signup form). Claude Desktop bundles its own Node.js runtime, so there's nothing else to install.
+> **You'll need:** the [**Claude Desktop**](https://claude.ai/download) app installed, and a free EurekaCodes account (just sign in with Google — no signup form). Claude Desktop bundles its own Node.js runtime, so there's nothing else to install.
 
 ### 🚀 One-Click Install — Claude Desktop (recommended, no terminal)
 
@@ -59,13 +70,22 @@ No code required. No tool names to remember. Just ask in natural language.
 2. **Install it.** Double-click **`flow-mcp.mcpb`**. Claude Desktop opens an **install window** — **leave the API Key field blank** (you'll log in from chat in the next step) and click **Install**.
    - *Mac says "unidentified developer"?* Right-click the file → **Open** → **Open**. That's normal for downloads.
    - *No install window appeared?* Open Claude Desktop → **Settings → Extensions** and drag the file in.
-3. **Log in — no key to copy.** In Claude, just say **"Log in to Eureka."** A browser window opens for **Google sign-in** — finish there, and Claude provisions and stores your API key automatically. *(Prefer to paste a key yourself? Get one at [flow.eureka.codes](https://flow.eureka.codes) → sign in → Create Key → Copy, and put it in the API Key field at step 2 instead.)*
+3. **Log in — no key to copy.** In Claude, just say **"Log in to Flow."** A browser window opens for **Google sign-in** — finish there, and Claude provisions and stores your API key automatically. *(Prefer to paste a key yourself? Get one at [flow.eureka.codes](https://flow.eureka.codes) → sign in → Create Key → Copy, and put it in the API Key field at step 2 instead.)*
 4. **Check it works.** Ask Claude *"Show my flows"*. If it answers at all — even *"you have no flows yet"* — you're connected! 🎉 Then try *"Create a flow"* or *"Check my credit balance"*.
    - *See a red error or "server disconnected" instead?* Open **Settings → Extensions** and confirm flow-mcp is enabled, then ask Claude to *"log in"* again.
 
 > One login unlocks everything — **flows** and **billing credits**. No key to copy, nothing technical to edit.
 
 ### Other clients (Cursor · Windsurf · VS Code · Claude Code)
+
+**One-click:** click a badge to auto-add the `npx` config, then say **"Log in to Flow"**:
+
+<p>
+  <a href="https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19"><img src="https://img.shields.io/badge/Add_to-Cursor-0A0A0A?style=flat-square&logo=cursor&logoColor=white" alt="Add flow-mcp to Cursor" /></a>
+  <a href="https://insiders.vscode.dev/redirect/mcp/install?name=flow-mcp&config=%7B%22name%22%3A%22flow-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40lemoncloud%2Fflow-mcp%22%5D%7D"><img src="https://img.shields.io/badge/Install_in-VS_Code-007ACC?style=flat-square" alt="Install flow-mcp in VS Code" /></a>
+</p>
+
+Or configure it manually:
 
 <details>
 <summary><b>Manual install</b> (npm + config file)</summary>
@@ -92,7 +112,7 @@ npm install -g @lemoncloud/flow-mcp
 - **Cursor / Windsurf / VS Code (Continue/Cline):** add the same `mcpServers` block to the IDE's MCP settings.
 - **Claude Code:** `claude mcp add flow-mcp -- npx -y @lemoncloud/flow-mcp`
 
-**3. Restart** your client and say **"Log in to Eureka"** — a browser opens for Google sign-in and your key is provisioned automatically. Then try **"Show my flows"**.
+**3. Restart** your client and say **"Log in to Flow"** — a browser opens for Google sign-in and your key is provisioned automatically. Then try **"Show my flows"**.
 
 > Prefer a fixed key? Get one at [flow.eureka.codes](https://flow.eureka.codes) (sign in → **Create Key** → **Copy**) and add `"env": { "FLOW_API_KEY": "ec-…" }` to the config above instead of logging in.
 
@@ -106,6 +126,19 @@ npm install -g @lemoncloud/flow-mcp
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket URL for real-time execution monitoring |
 
 </details>
+
+## Flow Templates
+
+Not sure where to start? flow-mcp ships **guided templates** that walk Claude through a complete workflow. In clients that support MCP prompts (Claude Desktop, Cursor), type `/` and pick one — or just ask for it by name:
+
+| Template | What it does |
+|----------|--------------|
+| **quick-flow** | Builds and runs a text input → buffer → preview flow (great first run) |
+| **etl-pipeline** | Builds a multi-step Extract → Transform → Load flow from your description |
+| **debug-execution** | Runs a flow, then inspects each node and port to find where it failed |
+| **publish-flow** | Creates (or takes an existing) flow and publishes it as a public template |
+
+Each template just steers Claude through the right `flow_read` / `flow_do` actions — no new permissions to approve.
 
 ## Examples
 

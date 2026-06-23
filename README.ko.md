@@ -17,6 +17,11 @@
 </p>
 
 <p align="center">
+  <b>쉽게 말하면:</b> Claude를 비롯한 AI 비서에게 워크플로우를 만들고 실행하는 능력을 더해 주는 도구입니다.<br/>
+  대화만 하면 됩니다 — 코딩도, 최초 로그인 외의 설정도 필요 없습니다.
+</p>
+
+<p align="center">
   <a href="README.md">English</a>
 </p>
 
@@ -28,6 +33,12 @@
   </picture>
 </p>
 
+## 어디에 쓰나요?
+
+**Eureka Flow**는 여러 단계를 이어 붙여 하나의 *플로우*로 만드는 비주얼 도구입니다. 입력을 받아 → 처리하고(요약·변환·AI 모델 호출·API 연동) → 결과를 얻습니다. 코드는 한 줄도 필요 없습니다. 각 단계가 하나의 **블록**이고, 블록을 연결해 데이터를 흘려보냅니다.
+
+원래는 에디터에서 플로우를 일일이 손으로 짜야 합니다. **flow-mcp**는 그 일을 AI 비서가 대신하도록 해 줍니다. 채팅으로 원하는 바를 말하면("내가 붙여넣는 글을 요약하는 플로우 만들어줘") AI가 플로우를 만들고, 실행하고, 결과까지 확인해 줍니다. Claude에게 Eureka Flow를 조작할 손을 쥐여 주는 셈입니다.
+
 ## 이런 게 됩니다
 
 **Claude Desktop**, **Cursor**, **Windsurf**, **VS Code (Continue/Cline)**, **Claude Code** 등 MCP를 지원하는 AI 클라이언트라면 어디서든 쓸 수 있습니다.
@@ -36,7 +47,7 @@
 
 | 하고 싶은 일 | 이렇게 말하세요 |
 |-------------|----------------|
-| 로그인 (키 복붙 없음) | "Eureka 로그인해줘" |
+| 로그인 (키 복붙 없음) | "Flow 로그인해줘" |
 | 워크플로우 목록 보기 | "내 flow 목록 보여줘" |
 | 새 워크플로우 만들기 | "텍스트 입력 → 버퍼 → 미리보기 flow 만들어줘" |
 | 워크플로우 실행 | "1004897 flow 실행해봐" |
@@ -51,7 +62,7 @@
 
 ## 시작하기
 
-> **준비물:** [**Claude Desktop**](https://claude.ai/download) 설치, 무료 Eureka 계정(Google 로그인만 하면 됨 — 별도 가입 양식 없음). Claude Desktop에 Node.js 런타임이 내장돼 있어 따로 설치할 건 없습니다.
+> **준비물:** [**Claude Desktop**](https://claude.ai/download) 설치, 무료 EurekaCodes 계정(Google 로그인만 하면 됨 — 별도 가입 양식 없음). Claude Desktop에 Node.js 런타임이 내장돼 있어 따로 설치할 건 없습니다.
 
 ### 🚀 원클릭 설치 — Claude Desktop (추천, 터미널 불필요)
 
@@ -59,13 +70,22 @@
 2. **설치.** **`flow-mcp.mcpb`** 더블클릭 → Claude Desktop **설치 창**이 열림 → **API 키 칸은 비워두고**(다음 단계에서 챗으로 로그인) **Install** 클릭.
    - *Mac이 "확인되지 않은 개발자" 경고?* 파일 우클릭 → **열기** → **열기**. 다운로드한 파일에서는 정상입니다.
    - *설치 창이 안 뜨면?* Claude Desktop → **설정 → 확장(Extensions)** 에서 파일을 드래그하세요.
-3. **로그인 — 키 복붙 없음.** Claude에게 **"Eureka 로그인해줘"** 라고 하면 구글 로그인 브라우저 창이 열립니다. 로그인만 완료하면 Claude가 API 키를 자동 발급·저장합니다. *(직접 키를 쓰고 싶다면 [flow.eureka.codes](https://flow.eureka.codes) → 로그인 → Create Key → Copy 후 2단계의 API 키 칸에 붙여넣으세요.)*
+3. **로그인 — 키 복붙 없음.** Claude에게 **"Flow 로그인해줘"** 라고 하면 Google 로그인 브라우저 창이 열립니다. 로그인만 완료하면 Claude가 API 키를 자동 발급·저장합니다. *(직접 키를 쓰고 싶다면 [flow.eureka.codes](https://flow.eureka.codes) → 로그인 → Create Key → Copy 후 2단계의 API 키 칸에 붙여넣으세요.)*
 4. **작동 확인.** Claude에게 *"내 flow 목록 보여줘"* — *"flow가 없습니다"* 라도 뜨면 연결 성공! 🎉 이어서 *"플로우 만들어줘"* 또는 *"내 크레딧 잔액 확인해줘"*.
    - *빨간 오류나 "server disconnected"가 보이면?* **설정 → 확장(Extensions)** 에서 flow-mcp가 켜져 있는지 확인하고 Claude에게 다시 *"로그인해줘"* 해보세요.
 
 > 로그인 한 번으로 **플로우 + 크레딧(빌링)** 모두 사용 가능. 키 복붙도, 설정 파일 편집도 없습니다.
 
 ### 다른 클라이언트 (Cursor · Windsurf · VS Code · Claude Code)
+
+**원클릭:** 배지를 누르면 `npx` 설정이 자동으로 추가됩니다. 그다음 **"Flow 로그인해줘"** 라고 말하세요:
+
+<p>
+  <a href="https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19"><img src="https://img.shields.io/badge/Add_to-Cursor-0A0A0A?style=flat-square&logo=cursor&logoColor=white" alt="Cursor에 flow-mcp 추가" /></a>
+  <a href="https://insiders.vscode.dev/redirect/mcp/install?name=flow-mcp&config=%7B%22name%22%3A%22flow-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40lemoncloud%2Fflow-mcp%22%5D%7D"><img src="https://img.shields.io/badge/Install_in-VS_Code-007ACC?style=flat-square" alt="VS Code에 flow-mcp 설치" /></a>
+</p>
+
+직접 설정하려면:
 
 <details>
 <summary><b>수동 설치</b> (npm + 설정 파일)</summary>
@@ -92,7 +112,7 @@ npm install -g @lemoncloud/flow-mcp
 - **Cursor / Windsurf / VS Code (Continue/Cline):** IDE의 MCP 설정에 동일한 `mcpServers` 블록 추가.
 - **Claude Code:** `claude mcp add flow-mcp -- npx -y @lemoncloud/flow-mcp`
 
-**3. 재시작** 후 **"Eureka 로그인해줘"** — 브라우저 구글 로그인으로 키가 자동 발급됩니다. 이어서 **"내 flow 목록 보여줘"**.
+**3. 재시작** 후 **"Flow 로그인해줘"** — 브라우저 Google 로그인으로 키가 자동 발급됩니다. 이어서 **"내 flow 목록 보여줘"**.
 
 > 고정 키를 쓰고 싶다면? [flow.eureka.codes](https://flow.eureka.codes)에서 발급(로그인 → **Create Key** → **Copy**) 후 위 설정에 `"env": { "FLOW_API_KEY": "ec-…" }` 를 추가하면 로그인 없이 바로 동작합니다.
 
@@ -106,6 +126,19 @@ npm install -g @lemoncloud/flow-mcp
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket 주소 (실시간 진행상황 모니터링) |
 
 </details>
+
+## 플로우 템플릿
+
+어디서 시작할지 막막하다면 flow-mcp에 내장된 **가이드 템플릿**을 쓰세요. Claude가 워크플로우를 처음부터 끝까지 진행하도록 단계별로 안내합니다. MCP 프롬프트를 지원하는 클라이언트(Claude Desktop, Cursor)에서는 `/`를 입력해 고르거나, 이름으로 바로 요청하면 됩니다:
+
+| 템플릿 | 하는 일 |
+|--------|---------|
+| **quick-flow** | text input → buffer → preview 플로우를 만들고 실행 (첫 실행에 추천) |
+| **etl-pipeline** | 설명을 바탕으로 추출 → 변환 → 적재 다단계 플로우 구성 |
+| **debug-execution** | 플로우를 실행한 뒤 노드·포트를 검사해 실패 지점 추적 |
+| **publish-flow** | 플로우를 만들거나 기존 것을 골라 공개 템플릿으로 게시 |
+
+각 템플릿은 알맞은 `flow_read` / `flow_do` 액션으로 Claude를 안내할 뿐 — 새로 승인할 권한은 없습니다.
 
 ## 사용 예시
 
@@ -202,7 +235,7 @@ flow-mcp는 도구가 **5개**뿐입니다 — 권한 승인을 31번이 아니�
 `{ action, params }` · 액션:
 `login` · `status` · `logout`
 
-> `login`은 구글 로그인 브라우저를 열어 API 키를 자동 발급·저장합니다 — 복붙 불필요. 도구마다 **"Always allow" 한 번**씩이면 끝. 읽기 도구 2개는 read-only라 부담 없이 허용할 수 있고, 데이터를 변경하거나 카드를 결제하는 건 `*_do` 도구뿐입니다.
+> `login`은 Google 로그인 브라우저를 열어 API 키를 자동 발급·저장합니다 — 복붙 불필요. 도구마다 **"Always allow" 한 번**씩이면 끝. 읽기 도구 2개는 read-only라 부담 없이 허용할 수 있고, 데이터를 변경하거나 카드를 결제하는 건 `*_do` 도구뿐입니다.
 
 ---
 
