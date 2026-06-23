@@ -21,6 +21,11 @@
 </p>
 
 <p align="center">
+  <a href="https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19"><img src="https://img.shields.io/badge/Add_to-Cursor-0A0A0A?style=flat-square&logo=cursor&logoColor=white" alt="Add flow-mcp to Cursor" /></a>
+  <a href="https://insiders.vscode.dev/redirect/mcp/install?name=flow-mcp&config=%7B%22name%22%3A%22flow-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40lemoncloud%2Fflow-mcp%22%5D%7D"><img src="https://img.shields.io/badge/Install_in-VS_Code-007ACC?style=flat-square" alt="Install flow-mcp in VS Code" /></a>
+</p>
+
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-dark.jpg" />
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-light.jpg" />
@@ -67,6 +72,8 @@ No code required. No tool names to remember. Just ask in natural language.
 
 ### Other clients (Cursor · Windsurf · VS Code · Claude Code)
 
+**One-click:** use the [**Add to Cursor**](https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19) / [**Install in VS Code**](https://insiders.vscode.dev/redirect/mcp/install?name=flow-mcp&config=%7B%22name%22%3A%22flow-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40lemoncloud%2Fflow-mcp%22%5D%7D) badges at the top — they auto-add the `npx` config below. Then say **"Log in to Eureka"**. Or configure it manually:
+
 <details>
 <summary><b>Manual install</b> (npm + config file)</summary>
 
@@ -106,6 +113,19 @@ npm install -g @lemoncloud/flow-mcp
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket URL for real-time execution monitoring |
 
 </details>
+
+## Flow Templates
+
+Not sure where to start? flow-mcp ships **guided templates** that walk Claude through a complete workflow. In clients that support MCP prompts (Claude Desktop, Cursor), type `/` and pick one — or just ask for it by name:
+
+| Template | What it does |
+|----------|--------------|
+| **quick-flow** | Builds and runs a text input → buffer → preview flow (great first run) |
+| **etl-pipeline** | Builds a multi-step Extract → Transform → Load flow from your description |
+| **debug-execution** | Runs a flow, then inspects each node and port to find where it failed |
+| **publish-flow** | Creates (or takes an existing) flow and publishes it as a public template |
+
+Each template just steers Claude through the right `flow_read` / `flow_do` actions — no new permissions to approve.
 
 ## Examples
 

@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { getConfigOrThrow } from './config';
 import { FlowApiClient } from './api-client';
 import { CredentialStore } from './auth/credentials';
-import { registerDispatchTools } from './tools';
+import { registerDispatchTools, registerFlowPrompts } from './tools';
 
 const { version: VERSION } = require('../package.json');
 
@@ -15,7 +15,7 @@ export const createServer = (): { run: () => Promise<void> } => {
     const server = new McpServer(
         { name: 'flow-mcp', version: VERSION },
         {
-            capabilities: { tools: {}, logging: {} },
+            capabilities: { tools: {}, logging: {}, prompts: {} },
             instructions:
                 'Eureka Flow MCP server. Auth: a single FLOW_API_KEY (x-api-key) unlocks both flows and credits ' +
                 '(flow.eureka.codes + billing.eureka.codes). ' +
@@ -42,6 +42,7 @@ export const createServer = (): { run: () => Promise<void> } => {
     );
 
     registerDispatchTools(server, client, config, credentials);
+    registerFlowPrompts(server);
 
     const run = async () => {
         const transport = new StdioServerTransport();

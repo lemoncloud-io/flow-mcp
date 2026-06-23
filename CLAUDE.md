@@ -23,6 +23,7 @@ src/
 │   ├── credit-tools.ts # 4 credit tools (balance/packs/purchase/history)
 │   ├── auth-tools.ts   # 3 auth tools (login/status/logout) — browser sign-in
 │   ├── dispatch.ts     # registers the public surface: flow_read/flow_do/credit_read/credit_do/auth (route action→captured handler)
+│   ├── prompts.ts      # guided MCP prompt templates (quick-flow/etl-pipeline/debug-execution/publish-flow) shown in the client's `/` picker
 │   └── index.ts        # barrel export
 ├── auth/
 │   ├── credentials.ts  # CredentialStore: env→~/.eureka/flow-mcp.json key resolution (0600)

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { registerDispatchTools } from '../../src/tools';
+import { registerDispatchTools, registerFlowPrompts, FLOW_PROMPTS } from '../../src/tools';
 import { CredentialStore } from '../../src/auth/credentials';
 import { makeConfig, makeFlow, makeBlock, makePortData, makeListResult, makeSaveFlow, makeNodeView, makeRun } from '../helpers/factories';
 import type { FlowApiClient } from '../../src/api-client';
@@ -12,9 +12,10 @@ import type { FlowApiClient } from '../../src/api-client';
 const createTestServer = (mockClient: Record<string, ReturnType<typeof vi.fn>>) => {
   const server = new McpServer(
     { name: 'flow-mcp-test', version: '0.0.1' },
-    { capabilities: { tools: {}, logging: {} } },
+    { capabilities: { tools: {}, logging: {}, prompts: {} } },
   );
   registerDispatchTools(server, mockClient as unknown as FlowApiClient, makeConfig(), new CredentialStore('ec-test-env-key'));
+  registerFlowPrompts(server);
   return server;
 };
 
@@ -73,6 +74,14 @@ describe('MCP Protocol Integration (dispatch tools)', () => {
   it('should expose exactly five tools: flow_read, flow_do, credit_read, credit_do, auth', async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(['auth', 'credit_do', 'credit_read', 'flow_do', 'flow_read']);
+  });
+
+  it('should list every guided prompt template and return its content', async () => {
+    const { prompts } = await client.listPrompts();
+    expect(prompts.map((p) => p.name).sort()).toEqual(FLOW_PROMPTS.map((p) => p.name).sort());
+
+    const first = await client.getPrompt({ name: FLOW_PROMPTS[0].name });
+    expect(first.messages[0].content).toMatchObject({ type: 'text' });
   });
 
   it('should have outputSchema on all tools', async () => {

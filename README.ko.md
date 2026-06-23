@@ -21,6 +21,11 @@
 </p>
 
 <p align="center">
+  <a href="https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19"><img src="https://img.shields.io/badge/Add_to-Cursor-0A0A0A?style=flat-square&logo=cursor&logoColor=white" alt="Cursor에 flow-mcp 추가" /></a>
+  <a href="https://insiders.vscode.dev/redirect/mcp/install?name=flow-mcp&config=%7B%22name%22%3A%22flow-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40lemoncloud%2Fflow-mcp%22%5D%7D"><img src="https://img.shields.io/badge/Install_in-VS_Code-007ACC?style=flat-square" alt="VS Code에 flow-mcp 설치" /></a>
+</p>
+
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-dark.jpg" />
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/lemoncloud-io/flow-mcp/main/docs/images/screenshot-light.jpg" />
@@ -67,6 +72,8 @@
 
 ### 다른 클라이언트 (Cursor · Windsurf · VS Code · Claude Code)
 
+**원클릭:** 상단의 [**Add to Cursor**](https://cursor.com/install-mcp?name=flow-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBsZW1vbmNsb3VkL2Zsb3ctbWNwIl19) / [**Install in VS Code**](https://insiders.vscode.dev/redirect/mcp/install?name=flow-mcp&config=%7B%22name%22%3A%22flow-mcp%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40lemoncloud%2Fflow-mcp%22%5D%7D) 배지를 누르면 아래 `npx` 설정이 자동으로 추가됩니다. 그다음 **"Eureka에 로그인해줘"** 라고 말하세요. 직접 설정하려면:
+
 <details>
 <summary><b>수동 설치</b> (npm + 설정 파일)</summary>
 
@@ -106,6 +113,19 @@ npm install -g @lemoncloud/flow-mcp
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket 주소 (실시간 진행상황 모니터링) |
 
 </details>
+
+## 플로우 템플릿
+
+어디서 시작할지 막막하다면 flow-mcp에 내장된 **가이드 템플릿**을 쓰세요. Claude를 워크플로우 전체로 안내합니다. MCP 프롬프트를 지원하는 클라이언트(Claude Desktop, Cursor)에서는 `/`를 입력해 고르거나, 이름으로 바로 요청하면 됩니다:
+
+| 템플릿 | 하는 일 |
+|--------|---------|
+| **quick-flow** | text input → buffer → preview 플로우를 만들고 실행 (첫 실행에 추천) |
+| **etl-pipeline** | 설명을 바탕으로 추출 → 변환 → 적재 다단계 플로우 구성 |
+| **debug-execution** | 플로우를 실행한 뒤 노드·포트를 검사해 실패 지점 추적 |
+| **publish-flow** | 플로우를 만들거나 기존 것을 골라 공개 템플릿으로 게시 |
+
+각 템플릿은 알맞은 `flow_read` / `flow_do` 액션으로 Claude를 안내할 뿐 — 새로 승인할 권한은 없습니다.
 
 ## 사용 예시
 
