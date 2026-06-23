@@ -211,6 +211,34 @@ describe('flow tool handlers', () => {
       });
     });
 
+    it('should save edges in a second call with indices resolved to saved node IDs', async () => {
+      const savedNodes = [makeNode({ id: 'real-a' }), makeNode({ id: 'real-b' })];
+      const saved = makeSaveFlow({ id: 'f-1', nodes: savedNodes, edges: [] });
+
+      mockClient.saveFlow
+        .mockResolvedValueOnce(saved) // first call: nodes only (edges stripped)
+        .mockResolvedValueOnce(saved); // second call: edges with real IDs
+
+      await handlers.flow_save({
+        flowId: 'f-1',
+        name: 'Rebuilt',
+        description: undefined,
+        nodes: [
+          { type: 'input-text', position: { x: 0, y: 0 } },
+          { type: 'output-text', position: { x: 200, y: 0 } },
+        ],
+        edges: [{ sourceNodeId: '0', sourcePortId: 'out', targetNodeId: '1', targetPortId: 'in' }],
+      });
+
+      expect(mockClient.saveFlow).toHaveBeenCalledTimes(2);
+      // First call must strip edges so the backend does not orphan them.
+      expect(mockClient.saveFlow.mock.calls[0][1].edges).toEqual([]);
+      // Second call resolves index refs to the real saved node IDs.
+      const secondCall = mockClient.saveFlow.mock.calls[1];
+      expect(secondCall[1].edges[0].sourceNodeId).toBe('real-a');
+      expect(secondCall[1].edges[0].targetNodeId).toBe('real-b');
+    });
+
     it('should return toolError on failure', async () => {
       mockClient.saveFlow.mockRejectedValue(new Error('save failed'));
 

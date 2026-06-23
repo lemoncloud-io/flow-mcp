@@ -64,7 +64,10 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 const result = await client.upsertFlow(flowId, {
                     nodes: [
                         filterDefined({
+                            // The web app's transformNodeForSave sets BOTH type (processType) and blockId
+                            // (blockId ?? type). Mirror it so the backend resolves the block on either key.
                             type: blockId,
+                            blockId,
                             position: position ?? { x: 400, y: 300 },
                             config: nodeConfig ?? {},
                             customLabel,
@@ -110,9 +113,13 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
 
                 const startTime = Date.now();
 
+                // Resolve the flow's WS channel so events arrive even when channelId isn't the '0000' default.
+                const channelId = (await client.loadFlow(flowId)).channelId;
+
                 const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
                     flowId,
                     expectedNodeIds: [nodeId],
+                    channelId,
                     timeout: timeout ?? 30_000,
                     onProgress: makeProgressHandler(extra),
                     triggerRun: connectionId =>
@@ -251,11 +258,19 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
         },
         async ({ flowId, nodeIds }) => {
             try {
+                // Match the canvas: delete a node AND its connected edges in the same upsert, otherwise
+                // edges are left dangling at a node that no longer exists. (WorkflowCanvas deleteNode.)
+                const idSet = new Set(nodeIds);
+                const flow = await client.loadFlow(flowId);
+                const danglingEdgeIds = (flow.edges ?? [])
+                    .filter(e => e.id && (idSet.has(e.sourceNodeId) || idSet.has(e.targetNodeId)))
+                    .map(e => e.id!);
+
                 await client.upsertFlow(flowId, {
                     nodes: nodeIds.map(id => ({ id: `#${id}` })),
-                    edges: [],
+                    edges: danglingEdgeIds.map(id => ({ id: `#${id}` })),
                 });
-                return toolResult({ deleted: nodeIds, flowId });
+                return toolResult({ deleted: nodeIds, deletedEdges: danglingEdgeIds, flowId });
             } catch (e) {
                 return toolError(e);
             }

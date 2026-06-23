@@ -379,23 +379,53 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
         {
             title: 'Save Flow',
             description:
-                'DANGEROUS: Full replace of ALL nodes and edges. Node IDs will be reassigned, breaking existing edges. ' +
-                'Only use for complete flow rebuilds. For modifications, use node_update (change properties), ' +
-                'node_delete (remove nodes), or flow_create (new flow) instead.',
+                'DANGEROUS: Full replace of ALL nodes and edges in an existing flow. Node IDs may be reassigned. ' +
+                'Edges are kept intact: reference nodes by array index (e.g., "0" for the first node) and they are ' +
+                'auto-resolved to the saved node IDs. Only use for complete flow rebuilds. For modifications, use ' +
+                'node_update (change properties), node_delete (remove nodes), or flow_create (new flow) instead.',
             inputSchema: z.object({
                 flowId,
                 name: z.optional(z.string()),
                 description: z.optional(z.string()),
                 nodes: z.array(NodeDataSchema).describe('Full node list (replaces ALL existing nodes)'),
-                edges: z.array(EdgeDataSchema).describe('Full edge list (replaces ALL existing edges)'),
+                edges: z
+                    .array(EdgeDataSchema)
+                    .describe(
+                        'Full edge list (replaces ALL existing edges). Use array index as node ID (e.g., "0") — ' +
+                            'resolved to the saved node IDs internally.',
+                    ),
             }),
             outputSchema: PassthroughSchema,
             annotations: { destructiveHint: true, idempotentHint: true },
         },
         async ({ flowId, name, description, nodes, edges }) => {
             try {
-                const result = await client.saveFlow(flowId, { name, description, nodes, edges });
-                return toolResult(result);
+                // Step 1: save nodes with no edges so the backend assigns/returns the real node IDs.
+                // (POST /flows/:id/save links edges only to nodes that exist in the same payload, so
+                // sending edges that reference pre-save/index IDs would orphan them — the original bug.)
+                const saved = await client.saveFlow(flowId, { name, description, nodes, edges: [] });
+
+                if (!edges.length || !saved.nodes?.length) {
+                    return toolResult(withUrl(saved));
+                }
+
+                // Step 2: resolve each edge's node refs (array index or real ID) against the saved
+                // nodes, then re-save so every edge points at a node that actually exists.
+                const realNodes = saved.nodes;
+                const resolvedEdges = edges.map(e => ({
+                    sourceNodeId: resolveNodeId(e.sourceNodeId, realNodes),
+                    sourcePortId: e.sourcePortId,
+                    targetNodeId: resolveNodeId(e.targetNodeId, realNodes),
+                    targetPortId: e.targetPortId,
+                }));
+
+                const final = await client.saveFlow(flowId, {
+                    name,
+                    description,
+                    nodes: realNodes,
+                    edges: resolvedEdges,
+                });
+                return toolResult(withUrl(final));
             } catch (e) {
                 return toolError(e);
             }
@@ -513,6 +543,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
                     flowId,
                     expectedNodeIds,
+                    channelId: flow.channelId,
                     timeout: timeout ?? 60_000,
                     onProgress: makeProgressHandler(extra),
                     triggerRun: async connectionId => {
@@ -584,6 +615,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
                     flowId,
                     expectedNodeIds: allNodeIds,
+                    channelId: flow.channelId,
                     timeout: timeout ?? 60_000,
                     onProgress: makeProgressHandler(extra),
                     triggerRun: async connectionId => {

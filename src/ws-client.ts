@@ -19,6 +19,8 @@ interface WaitForCompletionParams {
     triggerRun: (connectionId: string) => Promise<void>;
     timeout?: number;
     onProgress?: (event: ProgressEvent) => void;
+    /** WS channel to subscribe to (from the flow's load response). Defaults to '0000'. */
+    channelId?: string;
 }
 
 /** Check if all expected nodes are terminal via API snapshot */
@@ -151,7 +153,10 @@ export const executeWithWs = (
                 'Not authenticated — log in via the auth tool or set FLOW_API_KEY.',
             );
         }
-        const url = `${wsUrl}?x-api-key=${encodeURIComponent(apiKey)}&info=&channels=0000`;
+        // Subscribe to the flow's own channel — the web app uses the channelId from the load response,
+        // not a hardcoded value. A flow whose channelId isn't '0000' would otherwise receive no events.
+        const channel = params.channelId || '0000';
+        const url = `${wsUrl}?x-api-key=${encodeURIComponent(apiKey)}&info=&channels=${encodeURIComponent(channel)}`;
         const ws = new WebSocket(url);
 
         // The server only hands out a connectionId in response to an explicit info request (this is what
@@ -204,9 +209,13 @@ export const executeWithWs = (
                     return;
                 }
 
-                if (msg.action === 'info' && msg.data?.connectionId) {
-                    logger.debug(`Got connectionId: ${msg.data.connectionId}`);
-                    onConnectionId(msg.data.connectionId as string);
+                // Mirror websocket.worker.js: readiness is keyed on data.id (always present); connectionId
+                // may be null. Trigger as soon as the info reply arrives; pass connectionId when present
+                // (empty → run without a connection param, events still arrive via the channel sub).
+                if (msg.action === 'info' && msg.data?.id) {
+                    const conn = typeof msg.data.connectionId === 'string' ? msg.data.connectionId : '';
+                    logger.debug(`Info reply id=${msg.data.id}, connectionId=${conn || '(none)'}`);
+                    onConnectionId(conn);
                     return;
                 }
 
