@@ -107,8 +107,8 @@ export const executeWithWs = (
                         settle(false);
                         return;
                     }
-                } catch {
-                    /* API check failed — retry on the next quiet period */
+                } catch (err) {
+                    logger.debug('Quiet-period API check failed, retrying next period:', err);
                 }
                 if (!settled) resetQuietTimer();
             }, QUIET_PERIOD);
@@ -165,8 +165,9 @@ export const executeWithWs = (
         ws.on('open', () => {
             try {
                 ws.send(JSON.stringify({ type: 'system', action: 'info', data: {} }));
-            } catch {
-                /* send failures surface via the error/close handlers */
+            } catch (err) {
+                // Send failures still surface via the error/close handlers; log for diagnosis.
+                logger.debug('WS info request send failed:', err);
             }
         });
 
@@ -203,8 +204,8 @@ export const executeWithWs = (
                 if (msg.action === 'ping') {
                     try {
                         ws.send(JSON.stringify({ type: 'system', action: 'pong', data: { timestamp: Date.now() } }));
-                    } catch {
-                        /* ignore */
+                    } catch (err) {
+                        logger.debug('WS pong send failed:', err);
                     }
                     return;
                 }
@@ -240,8 +241,8 @@ export const executeWithWs = (
                     });
                     checkCompletion();
                 }
-            } catch {
-                /* ignore parse errors */
+            } catch (err) {
+                logger.debug('WS message parse failed, ignoring frame:', err);
             }
         });
 

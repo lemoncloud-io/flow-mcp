@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FlowApiClient, FlowApiError } from '../../src/api-client';
+import { FlowApiClient, FlowApiError, isRetryable, retryDelayMs } from '../../src/api-client';
 import { CredentialStore } from '../../src/auth/credentials';
 import { makeConfig, makeFlow, makeSaveFlow, makeNodeView, makePortData, makeBlock, makeListResult } from '../helpers/factories';
 
@@ -423,6 +423,14 @@ describe('FlowApiClient', () => {
       expect(err.message).toContain('Flow not found');
     });
 
+    it('should normalize 429 to rate_limit error', () => {
+      const { client } = createClient();
+      const err = callNormalize(client, createAxiosError({ status: 429, data: { message: 'slow down' } }));
+
+      expect(err.code).toBe('rate_limit');
+      expect(err.message).toContain('429');
+    });
+
     it('should normalize 500 to api error', () => {
       const { client } = createClient();
       const err = callNormalize(client, createAxiosError({ status: 500, data: { error: 'Internal error' } }));
@@ -457,6 +465,55 @@ describe('FlowApiClient', () => {
       const err = callNormalize(client, createAxiosError({ code: 'ECONNABORTED' }));
 
       expect(err.message).toContain('15000ms');
+    });
+  });
+
+  describe('retry policy', () => {
+    describe('isRetryable', () => {
+      it('retries GET on 429 / 502 / 503 / 504', () => {
+        for (const status of [429, 502, 503, 504]) {
+          expect(isRetryable('get', status, true)).toBe(true);
+        }
+      });
+
+      it('retries GET on a network failure (no response)', () => {
+        expect(isRetryable('get', undefined, false)).toBe(true);
+      });
+
+      it('does NOT retry GET on 4xx (other than 429) or 500', () => {
+        expect(isRetryable('get', 400, true)).toBe(false);
+        expect(isRetryable('get', 404, true)).toBe(false);
+        expect(isRetryable('get', 500, true)).toBe(false);
+      });
+
+      it('NEVER retries POST — run/save/purchase are not idempotent', () => {
+        expect(isRetryable('post', 503, true)).toBe(false);
+        expect(isRetryable('post', undefined, false)).toBe(false);
+        expect(isRetryable('POST', 429, true)).toBe(false);
+      });
+    });
+
+    describe('retryDelayMs', () => {
+      it('uses exponential backoff (500/1000/2000) when no Retry-After', () => {
+        expect(retryDelayMs(1)).toBe(500);
+        expect(retryDelayMs(2)).toBe(1000);
+        expect(retryDelayMs(3)).toBe(2000);
+      });
+
+      it('caps backoff at 8000ms', () => {
+        expect(retryDelayMs(10)).toBe(8000);
+      });
+
+      it('honors Retry-After delta-seconds', () => {
+        expect(retryDelayMs(1, '2')).toBe(2000);
+      });
+
+      it('honors Retry-After HTTP-date', () => {
+        const future = new Date(Date.now() + 3000).toUTCString();
+        const delay = retryDelayMs(1, future);
+        expect(delay).toBeGreaterThan(1000);
+        expect(delay).toBeLessThanOrEqual(3000);
+      });
     });
   });
 
