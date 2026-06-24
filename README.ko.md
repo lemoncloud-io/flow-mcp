@@ -124,6 +124,7 @@ npm install -g @lemoncloud/flow-mcp
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API 서버 주소 |
 | `FLOW_API_TIMEOUT` | | `30000` | API 요청 타임아웃 (ms) |
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket 주소 (실시간 진행상황 모니터링) |
+| `LOG_LEVEL` | | `info` | stderr 로그 상세도: `debug` \| `info` \| `warn` \| `error` |
 
 </details>
 
