@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { logger } from './logger';
 import { CredentialStore } from './auth/credentials';
 import type { FlowApiConfig } from './config';
@@ -18,6 +18,29 @@ import type {
     ProductView,
     TransactionView,
 } from './types';
+
+const MAX_RETRIES = 3;
+// Transient statuses worth retrying: rate limit + gateway/upstream errors. 500 is excluded — a hard
+// app error usually won't fix itself, and retrying it just delays the failure the caller needs to see.
+const RETRYABLE_STATUS = new Set([429, 502, 503, 504]);
+
+/** Only idempotent GETs retry; a network failure (no response) is also retryable. */
+export const isRetryable = (method: string, status?: number, hasResponse?: boolean): boolean => {
+    if (method.toLowerCase() !== 'get') return false;
+    if (!hasResponse) return true;
+    return status !== undefined && RETRYABLE_STATUS.has(status);
+};
+
+/** Honor Retry-After (delta-seconds or HTTP-date); else exponential backoff capped at 8s. */
+export const retryDelayMs = (attempt: number, retryAfter?: string): number => {
+    if (retryAfter) {
+        const secs = Number(retryAfter);
+        if (Number.isFinite(secs)) return Math.max(0, secs * 1000);
+        const date = Date.parse(retryAfter);
+        if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+    }
+    return Math.min(8000, 500 * 2 ** (attempt - 1));
+};
 
 export class FlowApiClient {
     private client: AxiosInstance;
@@ -61,11 +84,30 @@ export class FlowApiClient {
             return requestConfig;
         });
 
+        // Retry idempotent GETs on transient failures (429 / 5xx gateway / network), honoring Retry-After.
+        // POSTs are NEVER retried — flow/node `run` and credit `purchase` aren't safe to repeat blindly.
         this.client.interceptors.response.use(
             response => response,
-            error => {
+            async (error: AxiosError) => {
+                const cfg = error.config as (InternalAxiosRequestConfig & { __retry?: number }) | undefined;
+                const status = error.response?.status;
+                const method = cfg?.method ?? 'get';
+                const attempt = (cfg?.__retry ?? 0) + 1;
+                if (cfg && attempt <= MAX_RETRIES && isRetryable(method, status, !!error.response)) {
+                    cfg.__retry = attempt;
+                    const delay = retryDelayMs(attempt, error.response?.headers?.['retry-after'] as string | undefined);
+                    logger.warn(
+                        `Retry ${attempt}/${MAX_RETRIES} ${method.toUpperCase()} ${cfg.url} ` +
+                            `after ${delay}ms (status ${status ?? 'network'})`,
+                    );
+                    await new Promise(r => setTimeout(r, delay));
+                    return this.client(cfg);
+                }
                 const normalized = this.normalizeError(error);
-                logger.error(`${normalized.code}: ${normalized.message}`);
+                logger.error(
+                    `${normalized.code}: ${normalized.message} ` +
+                        `[${method.toUpperCase()} ${cfg?.url ?? '?'}${status ? ` ${status}` : ''}]`,
+                );
                 return Promise.reject(normalized);
             },
         );
@@ -285,12 +327,15 @@ export class FlowApiClient {
         if (status === 404) {
             return new FlowApiError('not_found', `Not found: ${message}`);
         }
+        if (status === 429) {
+            return new FlowApiError('rate_limit', `Rate limited (429): ${message}. Too many requests — retry shortly.`);
+        }
 
         return new FlowApiError('api', `API error (${status ?? 'network'}): ${message}`);
     }
 }
 
-export type FlowApiErrorCode = 'auth' | 'auth_required' | 'payment' | 'not_found' | 'timeout' | 'api';
+export type FlowApiErrorCode = 'auth' | 'auth_required' | 'payment' | 'not_found' | 'rate_limit' | 'timeout' | 'api';
 
 export class FlowApiError extends Error {
     constructor(

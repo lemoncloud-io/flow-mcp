@@ -23,8 +23,8 @@ npm run build
 ```
 src/
 ├── config.ts           # Zod v4 env validation
-├── logger.ts           # stderr-based logger (stdio MCP safe)
-├── api-client.ts       # Axios HTTP client (eureka-flows-api)
+├── logger.ts           # stderr-based logger (stdio MCP safe); LOG_LEVEL-gated
+├── api-client.ts       # Axios HTTP client (eureka-flows-api) — retries idempotent GETs
 ├── ws-client.ts        # WebSocket client (real-time execution monitoring)
 ├── types.ts            # Domain types (FlowView, NodeData, EdgeData, etc.)
 ├── tools/
