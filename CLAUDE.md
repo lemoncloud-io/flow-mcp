@@ -9,7 +9,7 @@ flow-mcp is an MCP (Model Context Protocol) server that provides AI assistants w
 ```
 src/
 ├── config.ts           # Zod v4 env validation (FLOW_API_URL, FLOW_WEB_URL, FLOW_API_KEY)
-├── logger.ts           # stderr-based logger (safe for stdio MCP)
+├── logger.ts           # stderr-based logger (safe for stdio MCP); gated by LOG_LEVEL env (default info)
 ├── api-client.ts       # Axios client for eureka-flows-api + block cache
 ├── types.ts            # Domain types (FlowView, NodeData, EdgeData, etc.)
 ├── tools/
@@ -43,7 +43,8 @@ src/
 - **Keyless start + browser login**: `FLOW_API_KEY` is optional (blank/empty coerced to unset). The server boots without a key; `FlowApiClient` injects the key per-request from `CredentialStore` (env wins, else `~/.eureka/flow-mcp.json`) and throws `FlowApiError('auth_required')` when absent. The `auth` tool's `login` action (`src/auth/login.ts`) opens a browser (loopback 127.0.0.1 OAuth), exchanges the code via `@lemoncloud/lemon-web-core`, mints an `ec-` key through `POST /_keys/0`, and persists it (0600). Endpoints in `src/auth/endpoints.ts` (prod defaults, env-overridable).
 - **MCP SDK v1.29** with v2 API (`McpServer` + `registerTool`)
 - **Zod v4** for input schemas (`import * as z from 'zod/v4'`)
-- **Error handling**: tool handlers return `{ isError: true, content: [...], structuredContent: { error, code? } }`, never throw
+- **Error handling**: tool handlers return `{ isError: true, content: [...], structuredContent: { error, code? } }`, never throw. `FlowApiError.code` ∈ `auth | auth_required | payment | not_found | rate_limit | timeout | api`
+- **Retry**: `FlowApiClient` retries idempotent GETs on 429/502/503/504/network (max 3, exp backoff ≤8s, honors `Retry-After`). POSTs (run/save/purchase) are never retried — not idempotent
 - **Structured output**: all tools declare `outputSchema` + return `structuredContent` via `toolResult()`
 - **Auto-completion**: `completable()` on flowId (30s cache), blockType (uses block cache), stereo fields
 - **Server logging**: `mcpLog()` sends `notifications/message` to MCP client during execution tools

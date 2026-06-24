@@ -124,6 +124,7 @@ npm install -g @lemoncloud/flow-mcp
 | `FLOW_API_URL` | | `https://api.eureka.codes/flw-v1` | API server URL |
 | `FLOW_API_TIMEOUT` | | `30000` | Request timeout (ms) |
 | `FLOW_WS_URL` | | `wss://wss.eureka.codes/wss-v1` | WebSocket URL for real-time execution monitoring |
+| `LOG_LEVEL` | | `info` | Log verbosity on stderr: `debug` \| `info` \| `warn` \| `error` |
 
 </details>
 
