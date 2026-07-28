@@ -216,6 +216,10 @@ flow-mcp exposes just **five** tools — so you approve permissions a handful of
 `{ action, params }` · Actions:
 `profile_get` · `flow_list` · `flow_load` · `flow_graph` · `flow_export` · `node_get` · `node_get_port` · `block_get` · `block_list` · `run_list` · `run_get`
 
+> `node_get` returns `config` / `inputData` / `outputData` as objects keyed by config key or port id —
+> the same shape `flow_load` uses. The server's array form (`config$`, `inputData$$`, `outputData$$`)
+> is decoded and no longer passed through.
+
 ### `flow_do` — edit & run flows ⚠️
 
 `{ action, params }` · Actions:
@@ -290,6 +294,9 @@ stdio.ts (console suppression + JSON-RPC filter)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)
       -> config.ts (Zod v4 env validation)
+
+@lemoncloud/flow-engine (shared graph rules: socket frame parsing + ordering,
+node-view decoding, edge dedup, id charset)
 ```
 
 ### WebSocket Execution Flow
