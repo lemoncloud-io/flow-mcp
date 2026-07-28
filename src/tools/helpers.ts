@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ServerNotification } from '@modelcontextprotocol/sdk/types.js';
-import type { ProgressEvent } from '../ws-client';
+import type { PortUpdate, ProgressEvent } from '../ws-client';
 import type { FlowApiClient } from '../api-client';
 import type { NodeData } from '../types';
 
@@ -27,9 +27,28 @@ export const toolError = (error: unknown) => {
 /** Build the web console link for a flow: `{base}/flows/{id}`. */
 export const flowWebUrl = (base: string, id: string): string => `${base.replace(/\/+$/, '')}/flows/${id}`;
 
-/** Extract portable node fields, stripping runtime state */
+/**
+ * Extract portable node fields, stripping runtime state.
+ *
+ * Everything that decides how a node behaves has to survive a clone or an export: `blockId` (the
+ * backend resolves the block from it), `autoExecutionEnabled` and `disabled` (both decide whether a
+ * node runs — `flow_run` picks start nodes by `autoExecutionEnabled !== false`), and `description`.
+ * Dropping them made a clone execute differently from its original.
+ *
+ * What stays out is the run: status/state, error, port data and executionStats — the same boundary
+ * the engine's `toSnapshot` draws (invariant 4: a run must not make a flow dirty).
+ */
 export const stripNodeRuntime = (nodes: NodeData[]) =>
-    nodes.map(n => ({ type: n.type, position: n.position, config: n.config, customLabel: n.customLabel }));
+    nodes.map(n => ({
+        type: n.type,
+        blockId: n.blockId,
+        position: n.position,
+        config: n.config,
+        customLabel: n.customLabel,
+        description: n.description,
+        disabled: n.disabled,
+        autoExecutionEnabled: n.autoExecutionEnabled,
+    }));
 
 /** Build onProgress callback from MCP extra context */
 export const makeProgressHandler = (extra: {
@@ -60,52 +79,34 @@ export interface ResolvedOutput {
     type?: string;
 }
 
-/** Parse a WS port id ("nodeId:portName@direction" or "nodeId:portName") into parts. */
-const parsePortRef = (id: string): { nodeId: string; portName: string; direction?: string } | null => {
-    const at = id.indexOf('@');
-    const portId = at !== -1 ? id.slice(0, at) : id;
-    const direction = at !== -1 ? id.slice(at + 1) : undefined;
-    const colon = portId.indexOf(':');
-    if (colon === -1) return null;
-    return { nodeId: portId.slice(0, colon), portName: portId.slice(colon + 1), direction };
-};
-
 /**
- * Resolve the actual output values from a run's WS event log. Each `node/port` event is only a
- * notification (id + runId, no value) — same as the web app, the value is fetched per port via the
+ * Resolve the actual output values for the out-ports a run reported. Each `node/port` frame is only
+ * a notification (id + runId, no value) — same as the web app, the value is fetched per port via the
  * run-scoped REST /port endpoint. Returns the resolved out-port values so callers get the real
  * result text without a second tool call. Ports that fail to resolve are skipped.
+ *
+ * The frames are parsed and ordered by the engine (`ws-client.routeFrame`), which hands back the
+ * out-ports already deduped — there is no port-id parsing left to do here.
  */
 export const resolveOutputs = async (
     client: FlowApiClient,
     flowId: string,
-    eventLog: Array<Record<string, unknown>>,
+    ports: PortUpdate[],
 ): Promise<ResolvedOutput[]> => {
-    // Keep the latest port event per out-port (later events carry the final value + runId).
-    const latest = new Map<string, { nodeId: string; portName: string; runId?: string }>();
-    for (const e of eventLog) {
-        if (e.type !== 'node/port' || typeof e.id !== 'string') continue;
-        const p = parsePortRef(e.id);
-        if (!p || p.direction !== 'out') continue;
-        latest.set(`${p.nodeId}:${p.portName}`, {
-            nodeId: p.nodeId,
-            portName: p.portName,
-            runId: typeof e.runId === 'string' ? e.runId : undefined,
-        });
-    }
-
-    const outputs: ResolvedOutput[] = [];
-    for (const { nodeId, portName, runId } of latest.values()) {
-        try {
-            const port = await client.getPortData(nodeId, portName, 'out', { flowId, runId });
-            if (port?.data && port.data.value !== undefined) {
-                outputs.push({ nodeId, port: portName, value: port.data.value, type: port.data.type });
+    // Ports are independent and already deduped, so they resolve concurrently: a single flaky port
+    // would otherwise hold up the rest through its retry backoff (GETs retry up to 3 times, ≤8s).
+    const settled = await Promise.all(
+        ports.map(async ({ nodeId, portName, runId }): Promise<ResolvedOutput | null> => {
+            try {
+                const port = await client.getPortData(nodeId, portName, 'out', { flowId, runId });
+                if (!port?.data || port.data.value === undefined) return null;
+                return { nodeId, port: portName, value: port.data.value, type: port.data.type };
+            } catch {
+                return null; // port not readable for this run — skip
             }
-        } catch {
-            /* port not readable for this run — skip */
-        }
-    }
-    return outputs;
+        }),
+    );
+    return settled.filter((output): output is ResolvedOutput => output !== null);
 };
 
 /** Send a log message to the MCP client */

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { toolResult, toolError } from '../../src/tools/helpers';
+import { toolResult, toolError, resolveOutputs } from '../../src/tools/helpers';
+import { makeApiClient } from '../helpers/factories';
 
 describe('toolResult', () => {
   it('should return both content and structuredContent', () => {
@@ -67,5 +68,32 @@ describe('toolError', () => {
   it('should always set isError to true', () => {
     expect(toolError('any').isError).toBe(true);
     expect(toolError(new Error('any')).isError).toBe(true);
+  });
+});
+
+// The out-ports come from ws-client.routeFrame already parsed and deduped; this only fetches values.
+describe('resolveOutputs', () => {
+  it('fetches each out-port run-scoped and returns its value', async () => {
+    const client = makeApiClient();
+    client.getPortData.mockResolvedValue({ data: { type: 'text', value: 'hello' } });
+
+    const outputs = await resolveOutputs(client as never, 'f-1', [{ nodeId: 'n-1', portName: 'out', runId: 'r-1' }]);
+
+    expect(client.getPortData).toHaveBeenCalledWith('n-1', 'out', 'out', { flowId: 'f-1', runId: 'r-1' });
+    expect(outputs).toEqual([{ nodeId: 'n-1', port: 'out', value: 'hello', type: 'text' }]);
+  });
+
+  it('skips ports that fail to read or carry no value', async () => {
+    const client = makeApiClient();
+    client.getPortData
+      .mockRejectedValueOnce(new Error('not readable'))
+      .mockResolvedValueOnce({ data: { type: 'text' } });
+
+    const outputs = await resolveOutputs(client as never, 'f-1', [
+      { nodeId: 'n-1', portName: 'out', runId: 'r-1' },
+      { nodeId: 'n-2', portName: 'out', runId: 'r-1' },
+    ]);
+
+    expect(outputs).toEqual([]);
   });
 });

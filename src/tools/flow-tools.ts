@@ -1,9 +1,12 @@
 import * as z from 'zod/v4';
+import { deduplicateEdges } from '@lemoncloud/flow-engine';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { EdgeData as EngineEdgeData } from '@lemoncloud/eureka-flows-api';
 import type { FlowApiClient } from '../api-client';
 import type { FlowApiConfig } from '../config';
 import { executeWithWs, isWsConfigured } from '../ws-client';
 import { TERMINAL_STATES } from '../types';
+import type { PortUpdate } from '../ws-client';
 import type { EdgeData } from '../types';
 import {
     filterDefined,
@@ -25,9 +28,24 @@ import {
     FlowRunOutputSchema,
 } from './schemas';
 
+/**
+ * Whether an id is safe to write as a node id.
+ *
+ * `POST /flows/:id/save` upserts by id, and four characters are load-bearing server-side: the API
+ * truncates an id at `-` (`api-flows.ts`: `id.split('-').at(0)`), `:` separates a port ref, `@` a
+ * run ref, and a leading `#` marks a delete. An id carrying one of them silently lands on another
+ * row instead of failing. `@lemoncloud/flow-engine`'s `core/ids.ts` owns this charset for the ids it
+ * mints; this is the same rule applied to ids a caller supplies.
+ */
+export const isWritableNodeId = (id: string): boolean => !/[:@-]/.test(id) && !id.startsWith('#');
+
 const NodeDataSchema = z.object({
     id: z
-        .optional(z.string())
+        .optional(
+            z.string().refine(isWritableNodeId, {
+                message: 'Node id cannot contain ":", "@" or "-", or start with "#" — the server reserves them.',
+            }),
+        )
         .describe('Existing node ID. Pass it to preserve the node (and its edges) across a save; omit for new nodes.'),
     blockId: z
         .optional(z.string())
@@ -46,6 +64,17 @@ const EdgeDataSchema = z.object({
     targetNodeId: z.string().describe('Target node ID or array index when creating.'),
     targetPortId: z.string().describe('Target port ID (e.g., "in"). Get from block inputs.'),
 });
+
+/**
+ * Collapse edges that connect the same two ports.
+ *
+ * `edge_create` posts `id: ''` and the server upserts by id — so it mints a new row every call and
+ * the same connection accumulates rows. The engine dedups on load for the same reason (the browser
+ * has always done this); here it is applied only to the read-only views. Elsewhere the server's own
+ * edge ids must survive untouched: `node_delete` deletes by them, and this returns engine-minted
+ * ids for edges that arrive without one.
+ */
+const dedupeEdges = (edges: EdgeData[]): EdgeData[] => deduplicateEdges(edges as EngineEdgeData[]) as EdgeData[];
 
 /** Remap edge node IDs from old IDs to index-based refs */
 const remapEdgesToIndices = (edges: EdgeData[], nodes: Array<{ id?: string }>) => {
@@ -67,6 +96,7 @@ interface RunResultOpts {
     timedOut: boolean;
     startTime: number;
     eventLog: Array<Record<string, unknown>>;
+    portUpdates: PortUpdate[];
     timeout?: number;
     startNodeId?: string;
 }
@@ -82,6 +112,7 @@ const buildRunResult = async (opts: RunResultOpts) => {
         timedOut,
         startTime,
         eventLog,
+        portUpdates,
         timeout,
         startNodeId,
     } = opts;
@@ -105,7 +136,7 @@ const buildRunResult = async (opts: RunResultOpts) => {
 
     const status = timedOut ? 'timeout' : hasError ? 'error' : 'completed';
     // Resolve the real out-port values from the run so callers see the result text directly.
-    const outputs = await resolveOutputs(client, flowId, eventLog);
+    const outputs = await resolveOutputs(client, flowId, portUpdates);
     return toolResult({
         flowId,
         url: flowWebUrl(webBaseUrl, flowId),
@@ -221,7 +252,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
             try {
                 const flow = await client.loadFlow(flowId);
                 const nodes = flow.nodes ?? [];
-                const edges = flow.edges ?? [];
+                const edges = dedupeEdges(flow.edges ?? []);
                 const ports = flow.ports ?? [];
 
                 const icon = (s?: string) =>
@@ -503,7 +534,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     name: flow.name,
                     description: flow.description,
                     nodes: stripNodeRuntime(flow.nodes ?? []),
-                    edges: remapEdgesToIndices(flow.edges ?? [], flow.nodes ?? []),
+                    edges: remapEdgesToIndices(dedupeEdges(flow.edges ?? []), flow.nodes ?? []),
                 });
             } catch (e) {
                 return toolError(e);
@@ -541,7 +572,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 }
 
                 const startTime = Date.now();
-                const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
+                const { nodeStates, timedOut, eventLog, portUpdates } = await executeWithWs(apiConfig, client, {
                     flowId,
                     expectedNodeIds,
                     channelId: flow.channelId,
@@ -572,6 +603,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     timedOut,
                     startTime,
                     eventLog,
+                    portUpdates,
                     timeout,
                     startNodeId,
                 });
@@ -632,7 +664,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                 const startNodeIds =
                     inputNodeIds.length > 0 ? inputNodeIds : allNodeIds.filter(id => !targetNodeIds.has(id));
 
-                const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
+                const { nodeStates, timedOut, eventLog, portUpdates } = await executeWithWs(apiConfig, client, {
                     flowId,
                     expectedNodeIds: allNodeIds,
                     channelId: flow.channelId,
@@ -666,6 +698,7 @@ export const registerFlowTools = (server: McpServer, client: FlowApiClient, apiC
                     timedOut,
                     startTime,
                     eventLog,
+                    portUpdates,
                     timeout,
                 });
             } catch (e) {
