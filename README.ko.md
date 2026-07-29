@@ -216,6 +216,10 @@ flow-mcp는 도구가 **5개**뿐입니다 — 권한 승인을 31번이 아니�
 `{ action, params }` · 액션:
 `profile_get` · `flow_list` · `flow_load` · `flow_graph` · `flow_export` · `node_get` · `node_get_port` · `block_get` · `block_list` · `run_list` · `run_get`
 
+> `node_get`은 `config` / `inputData` / `outputData`를 config 키·포트 id로 키잉된 **객체**로 반환합니다
+> (`flow_load`와 같은 모양). 서버의 배열 형태(`config$`, `inputData$$`, `outputData$$`)는 디코딩되며
+> 그대로 노출되지 않습니다.
+
 ### `flow_do` — 플로우 수정 & 실행 ⚠️
 
 `{ action, params }` · 액션:
@@ -290,6 +294,9 @@ stdio.ts (console suppression + JSON-RPC filter)
       -> api-client.ts (Axios -> flows-api REST)
       -> ws-client.ts (WebSocket -> real-time execution events)
       -> config.ts (Zod v4 env validation)
+
+@lemoncloud/flow-engine (공유 그래프 규칙: 소켓 프레임 파싱·순서, node-view 디코딩,
+엣지 dedup, id charset)
 ```
 
 ### WebSocket 실행 흐름

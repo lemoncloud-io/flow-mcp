@@ -1,11 +1,33 @@
 import * as z from 'zod/v4';
+import { mergeNodeView } from '@lemoncloud/flow-engine';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { NodeData as EngineNodeData } from '@lemoncloud/eureka-flows-api';
 import type { FlowApiClient } from '../api-client';
 import type { FlowApiConfig } from '../config';
+import type { NodeView } from '../types';
 import { executeWithWs, isWsConfigured } from '../ws-client';
 import { filterDefined, makeProgressHandler, mcpLog, resolveOutputs, toolError, toolResult } from './helpers';
 import { completableFlowId, completableBlockType } from './completions';
 import { PassthroughSchema, NodeRunOutputSchema } from './schemas';
+
+const WIRE_ONLY_KEYS = ['config$', 'inputData$$', 'outputData$$'];
+
+/**
+ * Decode what `GET /nodes/:id` sends into the shape the graph (and `flow_load`) uses.
+ *
+ * The endpoint describes config and port data as arrays — `config$`, `inputData$$`,
+ * `outputData$$` — while every other tool returns them as objects keyed by config key or port id.
+ * `mergeNodeView` owns the per-field rules (config replaces, `inputData$$` replaces, outputData
+ * merges); the wire keys are then removed so a caller never has two spellings of the same field.
+ */
+const decodeNodeView = (node: NodeView): Record<string, unknown> => {
+    const rest: Record<string, unknown> = { ...node };
+    for (const key of WIRE_ONLY_KEYS) delete rest[key];
+    // `{}` = no current graph state to merge against; the spread is what gives the engine's
+    // `NodeViewFields` (no index signature) the shape `filterDefined` accepts.
+    const decoded = mergeNodeView({}, node as Partial<EngineNodeData>);
+    return { ...rest, ...filterDefined({ ...decoded }) };
+};
 
 export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiConfig: FlowApiConfig) => {
     const flowId = completableFlowId(client);
@@ -26,8 +48,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
         },
         async ({ nodeId }) => {
             try {
-                const result = await client.getNode(nodeId);
-                return toolResult(result);
+                return toolResult(decodeNodeView(await client.getNode(nodeId)));
             } catch (e) {
                 return toolError(e);
             }
@@ -116,7 +137,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                 // Resolve the flow's WS channel so events arrive even when channelId isn't the '0000' default.
                 const channelId = (await client.loadFlow(flowId)).channelId;
 
-                const { nodeStates, timedOut, eventLog } = await executeWithWs(apiConfig, client, {
+                const { nodeStates, timedOut, eventLog, portUpdates } = await executeWithWs(apiConfig, client, {
                     flowId,
                     expectedNodeIds: [nodeId],
                     channelId,
@@ -135,7 +156,7 @@ export const registerNodeTools = (server: McpServer, client: FlowApiClient, apiC
                     `Node ${nodeId} ${timedOut ? 'timed out' : status} in ${duration}ms`,
                 );
 
-                const outputs = await resolveOutputs(client, flowId, eventLog);
+                const outputs = await resolveOutputs(client, flowId, portUpdates);
                 const result: Record<string, unknown> = {
                     nodeId,
                     flowId,

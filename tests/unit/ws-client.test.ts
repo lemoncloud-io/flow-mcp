@@ -268,3 +268,123 @@ describe('executeWithWs', () => {
     await expect(promise).rejects.toThrow('trigger failed');
   });
 });
+
+// Frame ordering rules come from @lemoncloud/flow-engine (parseSocketFrame + reduceNodeEvent /
+// reducePortEvent). These cover what this client got wrong on its own: sequence, state priority,
+// port-shaped ids, and the states the engine does not model.
+describe('executeWithWs — engine frame rules', () => {
+  beforeEach(() => {
+    instances.length = 0;
+  });
+
+  const frame = (data: Record<string, unknown>) => JSON.stringify({ action: 'message', data });
+  const nodeFrame = (data: Record<string, unknown>) => frame({ type: 'node', ...data });
+
+  const run = (expectedNodeIds: string[]) =>
+    executeWithWs(wsConfig, makeClient(), {
+      flowId: 'f-1',
+      expectedNodeIds,
+      triggerRun: vi.fn().mockResolvedValue(undefined),
+    });
+
+  it('ignores a frame that arrives behind the sequence high-water mark', async () => {
+    const promise = run(['n-1', 'n-2']);
+    await openAndInfo();
+    const ws = instances[0];
+
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'COMPLETED', no: 5, runId: 'r-1' }));
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'RUNNING', no: 2, runId: 'r-1' })); // stale
+    ws.emit('message', nodeFrame({ id: 'n-2', state: 'COMPLETED', no: 1, runId: 'r-1' }));
+
+    const result = await promise;
+    expect(result.nodeStates.get('n-1')).toBe('COMPLETED');
+  });
+
+  it('keeps ERROR when a later COMPLETED frame arrives for the same run', async () => {
+    const promise = run(['n-1', 'n-2']);
+    await openAndInfo();
+    const ws = instances[0];
+
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'ERROR', no: 1, stage: 'final', error: 'boom', runId: 'r-1' }));
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'COMPLETED', no: 2, runId: 'r-1' }));
+    ws.emit('message', nodeFrame({ id: 'n-2', state: 'COMPLETED', no: 1, runId: 'r-1' }));
+
+    const result = await promise;
+    expect(result.nodeStates.get('n-1')).toBe('ERROR');
+  });
+
+  it('applies a port-shaped node frame to the parent node', async () => {
+    const promise = run(['n-1']);
+    await openAndInfo();
+
+    instances[0].emit('message', nodeFrame({ id: 'n-1:out', state: 'COMPLETED', no: 1, runId: 'r-1' }));
+
+    const result = await promise;
+    expect(result.nodeStates.get('n-1')).toBe('COMPLETED');
+    expect(result.timedOut).toBe(false);
+  });
+
+  it('still treats SKIPPED as terminal (state the engine does not model)', async () => {
+    const promise = run(['n-1']);
+    await openAndInfo();
+
+    instances[0].emit('message', nodeFrame({ id: 'n-1', state: 'SKIPPED', no: 1, runId: 'r-1' }));
+
+    const result = await promise;
+    expect(result.nodeStates.get('n-1')).toBe('SKIPPED');
+    expect(result.timedOut).toBe(false);
+  });
+
+  it('does not let a late RUNNING frame walk a SKIPPED node back', async () => {
+    const promise = run(['n-1', 'n-2']);
+    await openAndInfo();
+    const ws = instances[0];
+
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'SKIPPED', no: 1, runId: 'r-1' }));
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'RUNNING', no: 2, runId: 'r-1' }));
+    ws.emit('message', nodeFrame({ id: 'n-2', state: 'COMPLETED', no: 1, runId: 'r-1' }));
+
+    const result = await promise;
+    expect(result.nodeStates.get('n-1')).toBe('SKIPPED');
+  });
+
+  it('ignores frames that name another flow', async () => {
+    const promise = run(['n-1']);
+    await openAndInfo();
+    const ws = instances[0];
+
+    // If this were applied, ERROR would outrank the COMPLETED that follows.
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'ERROR', no: 1, flowId: 'other-flow', runId: 'r-1' }));
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'COMPLETED', no: 2, flowId: 'f-1', runId: 'r-1' }));
+
+    const result = await promise;
+    expect(result.nodeStates.get('n-1')).toBe('COMPLETED');
+  });
+
+  it('resets a node when a new run reuses it, so the new run is not outranked', async () => {
+    const promise = run(['n-1', 'n-2']);
+    await openAndInfo();
+    const ws = instances[0];
+
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'ERROR', no: 3, stage: 'final', error: 'x', runId: 'r-1' }));
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'RUNNING', no: 1, runId: 'r-2' }));
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'COMPLETED', no: 2, runId: 'r-2' }));
+    ws.emit('message', nodeFrame({ id: 'n-2', state: 'COMPLETED', no: 1, runId: 'r-2' }));
+
+    const result = await promise;
+    expect(result.nodeStates.get('n-1')).toBe('COMPLETED');
+  });
+
+  it('collects out-port updates and skips in-port ones', async () => {
+    const promise = run(['n-1']);
+    await openAndInfo();
+    const ws = instances[0];
+
+    ws.emit('message', frame({ type: 'node/port', id: 'n-1:out@out', runId: 'r-1', no: 1 }));
+    ws.emit('message', frame({ type: 'node/port', id: 'n-1:in@in', runId: 'r-1', no: 1 }));
+    ws.emit('message', nodeFrame({ id: 'n-1', state: 'COMPLETED', no: 1, runId: 'r-1' }));
+
+    const result = await promise;
+    expect(result.portUpdates).toEqual([{ nodeId: 'n-1', portName: 'out', runId: 'r-1' }]);
+  });
+});

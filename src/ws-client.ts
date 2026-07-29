@@ -1,9 +1,17 @@
 import WebSocket from 'ws';
+import {
+    emptyExecutionState,
+    parseSocketFrame,
+    reduceNodeEvent,
+    reducePortEvent,
+    shouldUpdateState,
+} from '@lemoncloud/flow-engine';
 import { logger } from './logger';
 import type { FlowApiConfig } from './config';
 import { FlowApiError } from './api-client';
 import type { FlowApiClient } from './api-client';
 import { TERMINAL_STATES } from './types';
+import type { ExecutionState } from '@lemoncloud/flow-engine';
 
 export interface ProgressEvent {
     completedCount: number;
@@ -12,6 +20,89 @@ export interface ProgressEvent {
     state: string;
     elapsed: number;
 }
+
+/** An out-port the server reported during a run; its value is fetched over REST afterwards. */
+export interface PortUpdate {
+    nodeId: string;
+    portName: string;
+    runId?: string;
+}
+
+/** What one frame means for this run, after the engine's ordering rules have had their say. */
+interface FrameOutcome {
+    exec: ExecutionState;
+    /** States to apply, in arrival order. */
+    states: Array<{ nodeId: string; state: string }>;
+    /** Nodes a new run reset — forget what the previous run left. */
+    resets: string[];
+    ports: PortUpdate[];
+}
+
+// The engine's priority table only covers the states its `NodeState` union models (IDLE→ERROR).
+const RANKED_STATES = new Set(['IDLE', 'READY', 'RUNNING', 'COMPLETED', 'ERROR']);
+
+// SKIPPED is terminal for this client (`TERMINAL_STATES`) but absent from that union, so scoring it
+// directly would rank it below everything (priority -1) and drop it. Rank it as the terminal state it
+// is instead: a late RUNNING frame then cannot walk a skipped node back, while ERROR still wins.
+// Anything else unranked keeps the pre-engine last-write behaviour rather than being silently dropped.
+const RANK_AS: Record<string, string> = { SKIPPED: 'COMPLETED' };
+
+const acceptsState = (current: string | undefined, next: string): boolean => {
+    if (current === undefined) return true;
+    const from = RANK_AS[current] ?? current;
+    const to = RANK_AS[next] ?? next;
+    if (!RANKED_STATES.has(from) || !RANKED_STATES.has(to)) return true;
+    return shouldUpdateState(from, to);
+};
+
+/** The state as the server spelled it — kept for states the engine drops (see RANKED_STATES). */
+const rawStateOf = (msg: unknown): string | undefined => {
+    const data = (msg as { data?: unknown } | null)?.data;
+    const raw = data && typeof data === 'object' ? (data as { state?: unknown }).state : undefined;
+    return typeof raw === 'string' && raw ? raw : undefined;
+};
+
+/**
+ * Turn one socket frame into state changes, using the engine's parser and reducers.
+ *
+ * Ordering (sequence high-water mark, state priority, per-run reset, port-shaped ids) lives in
+ * `@lemoncloud/flow-engine` — the browser and the CLI already run these rules, and this client
+ * was the last consumer folding frames by last-write-wins.
+ */
+const routeFrame = (exec: ExecutionState, msg: unknown, flowId: string): FrameOutcome | null => {
+    const frame = parseSocketFrame(msg);
+    if (!frame) return null;
+
+    if (frame.kind === 'node') {
+        const rawState = rawStateOf(msg);
+        const { state, effects } = reduceNodeEvent(exec, frame.event, { currentFlowId: flowId });
+        const states: FrameOutcome['states'] = [];
+        const resets: string[] = [];
+        for (const effect of effects) {
+            if (effect.type === 'reset-node') resets.push(effect.nodeId);
+            if (effect.type !== 'apply') continue;
+            // A port-shaped frame patches its parent, so `effect.nodeId` is the node to move.
+            const next = (effect.patch as { state?: string }).state ?? rawState;
+            if (next) states.push({ nodeId: effect.nodeId, state: next });
+        }
+        return { exec: state, states, resets, ports: [] };
+    }
+
+    if (frame.kind === 'port') {
+        const { state, effects } = reducePortEvent(exec, frame.event, { currentFlowId: flowId });
+        // Only out-ports hold a result worth fetching. `direction` rides on the frame, not on the
+        // `port-updated` effect, so the pairing has to happen here.
+        if (frame.direction !== 'out') return { exec: state, states: [], resets: [], ports: [] };
+        const ports: PortUpdate[] = [];
+        for (const effect of effects) {
+            if (effect.type !== 'port-updated') continue;
+            ports.push({ nodeId: effect.nodeId, portName: effect.portName ?? '', runId: effect.runId });
+        }
+        return { exec: state, states: [], resets: [], ports };
+    }
+
+    return { exec, states: [], resets: [], ports: [] };
+};
 
 interface WaitForCompletionParams {
     flowId: string;
@@ -50,6 +141,7 @@ export const executeWithWs = (
     nodeStates: Map<string, string>;
     timedOut: boolean;
     eventLog: Array<Record<string, unknown>>;
+    portUpdates: PortUpdate[];
 }> => {
     const { flowId, expectedNodeIds, triggerRun, timeout = 60_000 } = params;
     const wsUrl = apiConfig.FLOW_WS_URL;
@@ -61,7 +153,10 @@ export const executeWithWs = (
     return new Promise((resolve, reject) => {
         const nodeStates = new Map<string, string>();
         const eventLog: Array<Record<string, unknown>> = [];
+        // Keyed by `nodeId:portName` so a port that reports twice resolves once.
+        const portUpdates = new Map<string, PortUpdate>();
         const startTs = Date.now();
+        let exec = emptyExecutionState();
         let settled = false;
         let terminalCount = 0;
         // eslint-disable-next-line prefer-const -- reassigned via setTimeout at end of scope
@@ -83,7 +178,7 @@ export const executeWithWs = (
             if (settled) return;
             settled = true;
             cleanup();
-            resolve({ nodeStates, timedOut, eventLog });
+            resolve({ nodeStates, timedOut, eventLog, portUpdates: [...portUpdates.values()] });
         };
 
         const fail = (err: Error) => {
@@ -124,6 +219,29 @@ export const executeWithWs = (
                 return;
             }
             resetQuietTimer();
+        };
+
+        /** A new run reused this node — the previous run's terminal state is no longer an answer. */
+        const forgetNodeState = (nodeId: string) => {
+            const prev = nodeStates.get(nodeId);
+            if (prev && TERMINAL_STATES.has(prev)) terminalCount--;
+            nodeStates.delete(nodeId);
+        };
+
+        const applyNodeState = (nodeId: string, state: string) => {
+            const prev = nodeStates.get(nodeId);
+            if (!acceptsState(prev, state)) return;
+            nodeStates.set(nodeId, state);
+            if (TERMINAL_STATES.has(state) && (!prev || !TERMINAL_STATES.has(prev))) terminalCount++;
+            logger.debug(`Node ${nodeId}: ${state}`);
+            params.onProgress?.({
+                completedCount: terminalCount,
+                totalCount: expectedNodeIds.length,
+                nodeId,
+                state,
+                elapsed: Date.now() - startTs,
+            });
+            checkCompletion();
         };
 
         const onConnectionId = async (connectionId: string) => {
@@ -225,22 +343,15 @@ export const executeWithWs = (
 
                 eventLog.push({ elapsed: Date.now() - startTs, ...d });
 
-                if (d.type === 'node' && typeof d.id === 'string' && typeof d.state === 'string') {
-                    const prevState = nodeStates.get(d.id);
-                    nodeStates.set(d.id, d.state);
-                    if (TERMINAL_STATES.has(d.state) && (!prevState || !TERMINAL_STATES.has(prevState))) {
-                        terminalCount++;
-                    }
-                    logger.debug(`Node ${d.id}: ${d.state} (${d.stage ?? ''})`);
-                    params.onProgress?.({
-                        completedCount: terminalCount,
-                        totalCount: expectedNodeIds.length,
-                        nodeId: d.id,
-                        state: d.state,
-                        elapsed: Date.now() - startTs,
-                    });
-                    checkCompletion();
-                }
+                const outcome = routeFrame(exec, msg, flowId);
+                if (!outcome) return;
+                exec = outcome.exec;
+                // A reset can be the whole frame (the new run's state arrives separately), so re-check
+                // instead of waiting for the quiet timer to notice.
+                for (const nodeId of outcome.resets) forgetNodeState(nodeId);
+                if (outcome.resets.length > 0 && outcome.states.length === 0) checkCompletion();
+                for (const { nodeId, state } of outcome.states) applyNodeState(nodeId, state);
+                for (const port of outcome.ports) portUpdates.set(`${port.nodeId}:${port.portName}`, port);
             } catch (err) {
                 logger.debug('WS message parse failed, ignoring frame:', err);
             }

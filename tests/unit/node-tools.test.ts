@@ -62,6 +62,48 @@ describe('node tool handlers', () => {
     });
   });
 
+  // GET /nodes/:id describes config and port data as arrays; the graph (flow_load) uses objects.
+  // mergeNodeView (engine) owns the per-field rules — config replaces, outputData merges.
+  describe('node_get', () => {
+    const call = async (node: Record<string, unknown>) => {
+      mockClient.getNode.mockResolvedValue(node);
+      const result = await handlers.node_get({ nodeId: 'n-1' });
+      return JSON.parse((result as { content: Array<{ text: string }> }).content[0].text);
+    };
+
+    it('decodes config$ into a config object and drops the wire key', async () => {
+      const parsed = await call({
+        id: 'n-1',
+        config$: [
+          { key: 'model', val: 'gemini-2.0-flash' },
+          { key: 'temp', val: '0.7' },
+        ],
+      });
+
+      expect(parsed.config).toEqual({ model: 'gemini-2.0-flash', temp: '0.7' });
+      expect(parsed).not.toHaveProperty('config$');
+    });
+
+    it('decodes inputData$$ / outputData$$ into port-keyed objects', async () => {
+      const parsed = await call({
+        id: 'n-1',
+        inputData$$: [{ portId: 'in', packet: { type: 'text', value: 'hi' } }],
+        outputData$$: [{ portId: 'out', packet: { type: 'text', value: 'bye' } }],
+      });
+
+      expect(parsed.inputData).toEqual({ in: { type: 'text', value: 'hi' } });
+      expect(parsed.outputData).toEqual({ out: { type: 'text', value: 'bye' } });
+      expect(parsed).not.toHaveProperty('inputData$$');
+      expect(parsed).not.toHaveProperty('outputData$$');
+    });
+
+    it('leaves a response without wire arrays unchanged', async () => {
+      const parsed = await call({ id: 'n-1', status: 'COMPLETED', config: { model: 'x' } });
+
+      expect(parsed).toMatchObject({ id: 'n-1', status: 'COMPLETED', config: { model: 'x' } });
+    });
+  });
+
   describe('node_run', () => {
     it('should call runNode with sync fallback when WS not configured', async () => {
       mockClient.runNode.mockResolvedValue(makeNodeView({ status: 'COMPLETED' }));

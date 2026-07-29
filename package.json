@@ -21,6 +21,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@lemoncloud/flow-engine": "^0.1.0",
     "@lemoncloud/lemon-web-core": "^1.5.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.14.0",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@lemoncloud/eureka-flows-api": "^0.26.620",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^3.2.4",
