@@ -47,7 +47,7 @@ const RANKED_STATES = new Set(['IDLE', 'READY', 'RUNNING', 'COMPLETED', 'ERROR']
 // Anything else unranked keeps the pre-engine last-write behaviour rather than being silently dropped.
 const RANK_AS: Record<string, string> = { SKIPPED: 'COMPLETED' };
 
-export const acceptsState = (current: string | undefined, next: string): boolean => {
+const acceptsState = (current: string | undefined, next: string): boolean => {
     if (current === undefined) return true;
     const from = RANK_AS[current] ?? current;
     const to = RANK_AS[next] ?? next;
@@ -69,7 +69,7 @@ const rawStateOf = (msg: unknown): string | undefined => {
  * `@lemoncloud/flow-engine` — the browser and the CLI already run these rules, and this client
  * was the last consumer folding frames by last-write-wins.
  */
-export const routeFrame = (exec: ExecutionState, msg: unknown, flowId: string): FrameOutcome | null => {
+const routeFrame = (exec: ExecutionState, msg: unknown, flowId: string): FrameOutcome | null => {
     const frame = parseSocketFrame(msg);
     if (!frame) return null;
 
