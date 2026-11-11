@@ -72,100 +72,29 @@ jobs:
           npx -y @anthropic-ai/mcpb@latest pack . flow-mcp.mcpb
           gh release upload "v$VERSION" flow-mcp.mcpb --clobber
 
-      - name: Prepare Slack message
+      - name: Notify DoU
         if: success() && steps.version.outputs.released == 'true'
-        id: slack-message
-        run: |
-          set -e
-          TIMESTAMP=$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S')
-          COMMIT_SHA="${GITHUB_SHA:0:7}"
-          echo "timestamp=$TIMESTAMP" >> "$GITHUB_OUTPUT"
-          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
-
-      - name: Post to Slack channel
-        if: success() && steps.version.outputs.released == 'true'
-        continue-on-error: true
-        uses: slackapi/slack-github-action@v2.1.1
+        uses: lemoncloud-io/actions/notify-dou@v1
         with:
-          method: chat.postMessage
-          token: ${{ secrets.RELEASE_BOT_TOKEN }}
-          payload: |
-            channel: ${{ secrets.EUREKACODES_CHANNEL }}
-            text: ":npm: Publish 알림"
-            unfurl_links: false
-            unfurl_media: false
-            attachments: [
-                {
-                    "color": "#36a64f",
-                    "blocks": [
-                        {
-                            "type": "section",
-                            "text": {
-                                "type": "mrkdwn",
-                                "text": "*@lemoncloud/flow-mcp* `v${{ steps.version.outputs.version }}` npm 배포 완료\n• <https://www.npmjs.com/package/@lemoncloud/flow-mcp|npm package> | <https://github.com/${{ github.repository }}/releases|Release Notes>"
-                            }
-                        },
-                        {
-                            "type": "divider"
-                        },
-                        {
-                            "type": "section",
-                            "fields": [
-                                {
-                                    "type": "mrkdwn",
-                                    "text": "*배포 시각:*\n${{ steps.slack-message.outputs.timestamp }}"
-                                },
-                                {
-                                    "type": "mrkdwn",
-                                    "text": "*커밋:*\n<https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ steps.slack-message.outputs.commit_sha }}>"
-                                }
-                            ]
-                        },
-                        {
-                            "type": "context",
-                            "elements": [
-                                {
-                                    "type": "mrkdwn",
-                                    "text": "by ${{ github.actor }} | <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Actions Run>"
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
+          url: ${{ secrets.DOU_WEBHOOK_URL }}
+          token: ${{ secrets.DOU_WEBHOOK_TOKEN }}
+          channel-id: ${{ secrets.DOU_CHANNEL_ID }}
+          status: success
+          stage: release
+          title: '@lemoncloud/flow-mcp v${{ steps.version.outputs.version }} npm 배포 완료'
+          text: |
+            • npm: https://www.npmjs.com/package/@lemoncloud/flow-mcp
+            • Release Notes: https://github.com/${{ github.repository }}/releases
 
-      - name: Notify Slack on failure
+      - name: Notify DoU - failure
         if: failure() && steps.release.outcome == 'failure'
-        continue-on-error: true
-        uses: slackapi/slack-github-action@v2.1.1
+        uses: lemoncloud-io/actions/notify-dou@v1
         with:
-          method: chat.postMessage
-          token: ${{ secrets.RELEASE_BOT_TOKEN }}
-          payload: |
-            channel: ${{ secrets.EUREKACODES_CHANNEL }}
-            text: ":x: flow-mcp 릴리스 실패"
-            unfurl_links: false
-            unfurl_media: false
-            attachments: [
-                {
-                    "color": "#E01E5A",
-                    "blocks": [
-                        {
-                            "type": "section",
-                            "text": {
-                                "type": "mrkdwn",
-                                "text": "*@lemoncloud/flow-mcp* 릴리스 파이프라인 실패\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Actions Run 확인>"
-                            }
-                        },
-                        {
-                            "type": "context",
-                            "elements": [
-                                {
-                                    "type": "mrkdwn",
-                                    "text": "by ${{ github.actor }} | <https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
+          url: ${{ secrets.DOU_WEBHOOK_URL }}
+          token: ${{ secrets.DOU_WEBHOOK_TOKEN }}
+          channel-id: ${{ secrets.DOU_CHANNEL_ID }}
+          status: failure
+          stage: release
+          text: |
+            *@lemoncloud/flow-mcp* 릴리스 파이프라인 실패
+            <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Actions Run 확인>
